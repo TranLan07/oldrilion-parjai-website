@@ -8,7 +8,7 @@ set -e
 
 DOMAIN="parjai.fr"
 APP_DIR="/var/www/parjai"
-REPO_URL="https://github.com/TranLan07/parjai-web.git"  # À modifier
+REPO_URL="https://github.com/TranLan07/oldrilion-parjai-website.git"
 
 echo "=== [1/7] Mise à jour du système ==="
 apt update && apt upgrade -y
