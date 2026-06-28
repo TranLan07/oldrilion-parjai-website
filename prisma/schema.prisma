@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Grade {
+  id               String @id @default(cuid())
+  name             String @unique
+  defaultPermission Int   @default(1)
+  order            Int    @default(0)
+  users            User[]
+}
+
+model LoreSection {
+  id          String @id @default(cuid())
+  order       Int
+  title       String
+  description String
+}
+
+model RuleSection {
+  id          String @id @default(cuid())
+  order       Int
+  title       String
+  description String
+}
+
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  passwordHash  String
+  displayName   String
+  role          String   @default("membre")
+  gradeId           String?
+  gradeRef          Grade?          @relation(fields: [gradeId], references: [id])
+  grade             String          @default("Recrue")
+  specializationId  String?
+  specializationRef Specialization? @relation(fields: [specializationId], references: [id])
+  specialization    String          @default("")
+  publicSpecialization String       @default("")
+  permissionLevel   Int             @default(1)
+  mustChangePassword Boolean @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sentMessages     Message[]
+  channelMembers   ChannelMember[]
+  channelFollows   ChannelFollower[]
+  missionMembers   MissionMember[]
+  recruitmentApplication Recruitment? @relation("applicant")
+}
+
+model Recruitment {
+  id          String   @id @default(cuid())
+  rpName      String
+  discord     String
+  experience  String
+  motivation  String
+  specialization String @default("")
+  status      String   @default("pending") // pending, approved, rejected
+  tempPassword String?
+  userId      String?  @unique
+  user        User?    @relation("applicant", fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PagePermission {
+  id              String @id @default(cuid())
+  path            String @unique
+  label           String
+  minPermission   Int    @default(1)
+}
+
+model Channel {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  description     String   @default("")
+  isPrivate       Boolean  @default(false)
+  emailNotifEnabled Boolean @default(true)
+  emailNotifDelayMin Int   @default(120)
+  createdAt       DateTime @default(now())
+
+  members     ChannelMember[]
+  messages    Message[]
+  followers   ChannelFollower[]
+}
+
+model ChannelMember {
+  id        String  @id @default(cuid())
+  userId    String
+  channelId String
+  muted     Boolean @default(false)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelId])
+}
+
+model ChannelFollower {
+  id            String   @id @default(cuid())
+  email         String
+  channelId     String
+  userId        String
+  confirmed     Boolean  @default(false)
+  confirmToken  String   @unique
+  lastNotifAt   DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel       Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  userId    String
+  channelId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+}
+
+model Specialization {
+  id               String  @id @default(cuid())
+  name             String  @unique
+  description      String  @default("")
+  defaultPermission Int    @default(1)
+  secret           Boolean @default(false)
+  order            Int     @default(0)
+  users            User[]
+}
+
+model Mission {
+  id              String   @id @default(cuid())
+  title           String
+  description     String
+  status          String   @default("en_cours")
+  confidentiality String   @default("standard")
+  maxParticipants Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  members MissionMember[]
+}
+
+model MissionMember {
+  id        String  @id @default(cuid())
+  userId    String
+  missionId String
+  participating Boolean @default(true)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission   Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, missionId])
+}
+
+model DictionaryEntry {
+  id      String @id @default(cuid())
+  french  String @unique
+  mandoa  String
+}
