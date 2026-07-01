@@ -206,6 +206,7 @@ model Channel {
   accessGrades String @default("[]")  // JSON array of grade names
   accessSpecs  String @default("[]")  // JSON array of spec names
   accessUsers  String @default("[]")  // JSON array of publicIds
+  accessClans  String @default("[]")  // JSON array of clanIds (hub private channels)
 
   members   ChannelMember[]
   messages  Message[]
