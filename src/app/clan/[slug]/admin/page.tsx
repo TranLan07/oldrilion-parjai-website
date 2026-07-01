@@ -16,7 +16,7 @@ type Grade = { id: string; name: string; defaultPermission: number; order: numbe
 type DictEntry = { id: string; french: string; mandoa: string };
 type Spec = { id: string; name: string; description: string; defaultPermission: number; secret: boolean; order: number; _count: { users: number } };
 
-type Tab = "users" | "recruitment" | "channels" | "missions" | "pages" | "lore" | "rules" | "grades" | "specs" | "dictionary" | "tags";
+type Tab = "users" | "recruitment" | "channels" | "missions" | "evenements" | "pages" | "lore" | "rules" | "grades" | "specs" | "dictionary" | "tags";
 
 const inp = "w-full rounded border border-accent-dim/30 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent";
 const btnDanger = "rounded bg-red-900/30 px-3 py-1.5 text-sm text-red-400 hover:bg-red-900/50";
@@ -46,7 +46,7 @@ export default function AdminPage() {
 
   const apiMap: Record<Tab, string> = {
     users: "/api/clan/${slug}/admin/users", recruitment: "/api/clan/${slug}/admin/recruitment", channels: "/api/clan/${slug}/admin/channels",
-    missions: "/api/clan/${slug}/admin/missions", pages: "/api/clan/${slug}/admin/pages",
+    missions: "/api/clan/${slug}/admin/missions", evenements: "/api/clan/${slug}/admin/evenements", pages: "/api/clan/${slug}/admin/pages",
     lore: "/api/clan/${slug}/admin/lore", rules: "/api/clan/${slug}/admin/rules", grades: "/api/clan/${slug}/admin/grades", specs: "/api/clan/${slug}/admin/specializations", dictionary: "/api/clan/${slug}/admin/dictionary", tags: "/api/clan/${slug}/admin/tags",
   };
 
@@ -56,7 +56,7 @@ export default function AdminPage() {
     const data = await res.json();
     const m: Record<Tab, (d: unknown) => void> = {
       users: (d) => setUsers(d as User[]), recruitment: (d) => setRecruitments(d as Recruitment[]),
-      channels: (d) => setChannels(d as Channel[]), missions: (d) => setMissions(d as Mission[]),
+      channels: (d) => setChannels(d as Channel[]), missions: (d) => setMissions(d as Mission[]), evenements: () => {},
       pages: (d) => setPages(d as PagePerm[]), lore: (d) => setLoreSections(d as ContentSection[]),
       rules: (d) => setRuleSections(d as ContentSection[]), grades: (d) => setGrades(d as Grade[]),
       dictionary: (d) => setDictEntries(d as DictEntry[]),
@@ -91,7 +91,7 @@ export default function AdminPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: "users", label: "Utilisateurs" }, { key: "recruitment", label: "Recrutement" },
     { key: "grades", label: "Grades" }, { key: "channels", label: "Canaux" },
-    { key: "missions", label: "Missions" }, { key: "lore", label: "Lore" },
+    { key: "missions", label: "Missions" }, { key: "evenements", label: "Evenements" }, { key: "lore", label: "Lore" },
     { key: "rules", label: "Règles" }, { key: "specs", label: "Spécialisations" },
     { key: "dictionary", label: "Dictionnaire" }, { key: "pages", label: "Permissions" }, { key: "tags", label: "Tags" },
   ];
@@ -112,6 +112,7 @@ export default function AdminPage() {
       {tab === "grades" && <GradesTab grades={grades} api={api} />}
       {tab === "channels" && <ChannelsTab channels={channels} users={users} grades={grades} specs={specs} api={api} load={load} />}
       {tab === "missions" && <MissionsTab missions={missions} api={api} />}
+      {tab === "evenements" && <EvenementsTab slug={slug} />}
       {tab === "lore" && <ContentTab sections={loreSections} endpoint="/api/clan/${slug}/admin/lore" label="Lore" api={api} />}
       {tab === "rules" && <ContentTab sections={ruleSections} endpoint="/api/clan/${slug}/admin/rules" label="Règle" api={api} />}
       {tab === "specs" && <SpecsTab specs={specs} api={api} />}
@@ -1041,6 +1042,72 @@ function TagsTab({ slug }: { slug: string }) {
             <p className="text-sm" style={{ color: "var(--beskar-500)" }}>Tous les tags sont déjà assignés, ou aucun tag n'existe (créez-en depuis l'Admin Hub).</p>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// -- EvenementsTab --
+function EvenementsTab({ slug }: { slug: string }) {
+  type AdminEvent = { id: string; title: string; status: string; visibility: string; _count: { members: number } };
+  const [events, setEvents] = useState<AdminEvent[]>([]);
+  const [form, setForm] = useState({ title: "", description: "", status: "a_venir", visibility: "internal", maxParticipants: "", startAt: "" });
+
+  const loadEv = async () => {
+    const r = await fetch(`/api/clan/${slug}/admin/evenements`);
+    if (r.ok) setEvents(await r.json());
+  };
+  useEffect(() => { loadEv(); }, []);
+
+  async function create() {
+    if (!form.title.trim()) return;
+    await fetch(`/api/clan/${slug}/admin/evenements`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, maxParticipants: form.maxParticipants ? Number(form.maxParticipants) : null, startAt: form.startAt || null }),
+    });
+    setForm({ title: "", description: "", status: "a_venir", visibility: "internal", maxParticipants: "", startAt: "" });
+    loadEv();
+  }
+
+  async function del(id: string) {
+    await fetch(`/api/clan/${slug}/admin/evenements`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    loadEv();
+  }
+
+  const inp2 = "w-full rounded border border-accent-dim/30 bg-background px-3 py-2 text-sm text-foreground outline-none";
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground/50">Creer un evenement</h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <input placeholder="Titre" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className={inp2} />
+          <input placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={inp2} />
+          <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className={inp2}>
+            <option value="a_venir">A venir</option>
+            <option value="en_cours">En cours</option>
+            <option value="termine">Termine</option>
+          </select>
+          <select value={form.visibility} onChange={e => setForm({ ...form, visibility: e.target.value })} className={inp2}>
+            <option value="internal">Interne (membres clan)</option>
+            <option value="global">Global (tous les membres hub)</option>
+            <option value="private">Prive (inscrits uniquement)</option>
+          </select>
+          <input placeholder="Max participants (vide = illimite)" type="number" value={form.maxParticipants} onChange={e => setForm({ ...form, maxParticipants: e.target.value })} className={inp2} />
+          <input type="datetime-local" value={form.startAt} onChange={e => setForm({ ...form, startAt: e.target.value })} className={inp2} />
+        </div>
+        <button onClick={create} className={btnPrimary}>Creer</button>
+      </div>
+      <div className="space-y-2">
+        {events.map(ev => (
+          <div key={ev.id} className="flex items-center justify-between rounded border border-accent-dim/20 bg-surface p-3">
+            <div>
+              <p className="font-semibold text-sm text-foreground">{ev.title}</p>
+              <p className="text-xs text-foreground/40">{ev.status} · {ev.visibility} · {ev._count.members} participants</p>
+            </div>
+            <button onClick={() => del(ev.id)} className={btnDanger}>Supprimer</button>
+          </div>
+        ))}
       </div>
     </div>
   );

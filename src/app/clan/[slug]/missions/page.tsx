@@ -1,5 +1,4 @@
-"use client";
-"use client";
+﻿"use client";
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useCallback } from "react";
@@ -7,31 +6,20 @@ import { useParams } from "next/navigation";
 
 type MissionMember = {
   participating: boolean;
-  user: { id: string; displayName: string; role: string };
+  user: { id: string; displayName: string };
 };
-
 type Mission = {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  confidentiality: string;
-  maxParticipants: number;
-  createdAt: string;
+  id: string; title: string; description: string;
+  status: string; confidentiality: string; visibility: string;
+  maxParticipants: number; createdAt: string;
   members: MissionMember[];
 };
 
-const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
-  en_cours: { label: "En cours", color: "border-blue-700/40 bg-blue-900/20 text-blue-400", icon: "⏳" },
-  validee: { label: "Validée", color: "border-green-700/40 bg-green-900/20 text-green-400", icon: "✓" },
-  abandonnee: { label: "Abandonnée", color: "border-yellow-700/40 bg-yellow-900/20 text-yellow-400", icon: "⏸" },
-  ratee: { label: "Ratée", color: "border-red-700/40 bg-red-900/20 text-red-400", icon: "✗" },
-};
-
-const confLabels: Record<string, string> = {
-  standard: "Standard",
-  secret: "Secret",
-  top_secret: "Top Secret",
+const statusMap: Record<string, { label: string; color: string }> = {
+  en_cours:   { label: "En cours",   color: "#3b82f6" },
+  validee:    { label: "Validee",    color: "#22c55e" },
+  abandonnee: { label: "Abandonnee", color: "#eab308" },
+  ratee:      { label: "Ratee",      color: "#ef4444" },
 };
 
 export default function MissionsPage() {
@@ -39,181 +27,144 @@ export default function MissionsPage() {
   const slug = params.slug as string;
   const { data: session } = useSession();
   const [missions, setMissions] = useState<Mission[]>([]);
-  const [filter, setFilter] = useState<string>("all");
-  const [mode, setMode] = useState<"standard" | "dha">("standard");
+  const [filter, setFilter] = useState("all");
   const userId = session?.user?.id;
   const perm = ((session as unknown as Record<string, unknown>)?.permissionLevel as number) || 0;
   const canDha = perm >= 7;
+  const [mode, setMode] = useState<"standard" | "dha">("standard");
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/missions?mode=${mode}`);
+    const res = await fetch(`/api/clan/${slug}/missions?mode=${mode}`);
     if (res.ok) setMissions(await res.json());
-  }, [mode]);
+  }, [slug, mode]);
 
-  useEffect(() => {
-    if (session) load();
-  }, [session, load]);
+  useEffect(() => { if (session) load(); }, [session, load]);
 
   async function toggleParticipation(missionId: string, current: boolean) {
-    await fetch(`/api/missions/${missionId}/participate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    await fetch(`/api/clan/${slug}/missions/${missionId}/participate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ participating: !current }),
     });
     load();
   }
 
-  if (!session) {
-    return <div className="p-12 text-center text-foreground/50">Connectez-vous pour accéder aux missions.</div>;
-  }
+  if (!session) return <div className="p-12 text-center text-sm" style={{ color: "var(--clan-accent, #6b7280)" }}>Connectez-vous pour voir les missions.</div>;
 
+  const filtered = filter === "all" ? missions : missions.filter(m => m.status === filter);
   const isDha = mode === "dha";
-  const filtered = filter === "all" ? missions : missions.filter((m) => m.status === filter);
-
-  const accentColor = isDha ? "purple" : "accent";
+  const accentColor = "var(--clan-primary, #c9a84c)";
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-16">
-      {/* Header */}
-      <div className={`mb-8 rounded-lg border p-6 ${
-        isDha
-          ? "border-purple-800/30 bg-gradient-to-r from-purple-950/40 to-background"
-          : "border-accent-dim/20 bg-gradient-to-r from-surface to-background"
-      }`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className={`text-4xl font-bold tracking-widest ${isDha ? "text-purple-400" : "text-accent"}`}>
-              {isDha ? "MISSIONS DHA" : "MISSIONS"}
-            </h1>
-            <p className={`mt-1 ${isDha ? "text-purple-300/50" : "text-foreground/50"}`}>
-              {isDha ? "Opérations classifiées — Espace Dha" : "Opérations du clan Parjai"}
-            </p>
-          </div>
-
-          {/* Switch Dha */}
-          {canDha && (
-            <button
-              onClick={() => { setMode(isDha ? "standard" : "dha"); setFilter("all"); }}
-              className={`flex items-center gap-3 rounded-full border px-5 py-2.5 text-sm font-medium uppercase tracking-wider transition-all ${
-                isDha
-                  ? "border-purple-600 bg-purple-900/40 text-purple-300 hover:bg-purple-900/60"
-                  : "border-accent-dim/30 bg-surface text-foreground/60 hover:border-purple-600 hover:text-purple-400"
-              }`}
-            >
-              {/* Toggle visual */}
-              <div className={`relative h-5 w-9 rounded-full transition-colors ${isDha ? "bg-purple-600" : "bg-foreground/20"}`}>
-                <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${isDha ? "translate-x-4" : "translate-x-0.5"}`} />
-              </div>
-              <span>Mode Dha</span>
-            </button>
-          )}
+    <div className="mx-auto max-w-4xl px-6 py-12">
+      <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--clan-accent, #4a4a4a)" }}>
+            {isDha ? "Operation Dha" : "Missions"}
+          </p>
+          <h1 className="text-4xl font-bold uppercase tracking-[0.14em]"
+            style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #f2f2f5)" }}>
+            {isDha ? "Classifiees" : "Missions"}
+          </h1>
         </div>
+        {canDha && (
+          <button
+            onClick={() => { setMode(isDha ? "standard" : "dha"); setFilter("all"); }}
+            className="rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-all"
+            style={{
+              borderColor: isDha ? "#a259e0" : "var(--clan-primary, #c9a84c)",
+              color: isDha ? "#a259e0" : "var(--clan-primary, #c9a84c)",
+            }}>
+            {isDha ? "Mode standard" : "Mode Dha"}
+          </button>
+        )}
       </div>
 
-      {/* Filtres */}
+      {/* Filtres statut */}
       <div className="mb-6 flex flex-wrap gap-2">
-        <button
-          onClick={() => setFilter("all")}
-          className={`rounded px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors ${
-            filter === "all"
-              ? isDha ? "bg-purple-800/40 text-purple-300" : "bg-accent/20 text-accent"
-              : "bg-surface text-foreground/50 hover:text-foreground"
-          }`}
-        >Toutes ({missions.length})</button>
-        {Object.entries(statusConfig).map(([key, cfg]) => {
-          const count = missions.filter((m) => m.status === key).length;
+        {["all", "en_cours", "validee", "abandonnee", "ratee"].map(k => {
+          const count = k === "all" ? missions.length : missions.filter(m => m.status === k).length;
+          const label = k === "all" ? `Toutes (${count})` : `${statusMap[k]?.label} (${count})`;
+          const isActive = filter === k;
           return (
-            <button key={key} onClick={() => setFilter(key)}
-              className={`rounded px-3 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors ${
-                filter === key
-                  ? isDha ? "bg-purple-800/40 text-purple-300" : "bg-accent/20 text-accent"
-                  : "bg-surface text-foreground/50 hover:text-foreground"
-              }`}
-            >{cfg.icon} {cfg.label} ({count})</button>
+            <button key={k} onClick={() => setFilter(k)}
+              className="rounded-sm border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-all"
+              style={{
+                borderColor: isActive ? accentColor : "#2a2a2a",
+                color: isActive ? accentColor : "#4a4a4a",
+                background: isActive ? `color-mix(in srgb, var(--clan-primary, #c9a84c) 10%, transparent)` : "transparent",
+              }}>
+              {label}
+            </button>
           );
         })}
       </div>
 
-      {/* Liste */}
-      <div className="space-y-4">
-        {filtered.length === 0 && (
-          <div className="py-12 text-center">
-            <p className="text-lg text-foreground/40">
-              {isDha ? "Aucune mission classifiée." : "Aucune mission en cours."}
-            </p>
-          </div>
-        )}
+      {filtered.length === 0 && (
+        <p className="py-16 text-center text-sm" style={{ color: "#4a4a4a" }}>Aucune mission.</p>
+      )}
 
-        {filtered.map((mission) => {
-          const st = statusConfig[mission.status] || statusConfig.en_cours;
-          const isParticipating = mission.members.some((m) => m.user.id === userId && m.participating);
+      <div className="space-y-4">
+        {filtered.map(mission => {
+          const st = statusMap[mission.status];
+          const isParticipating = mission.members.some(m => m.user.id === userId && m.participating);
+          const isFull = mission.maxParticipants > 0 && mission.members.length >= mission.maxParticipants && !isParticipating;
 
           return (
-            <div
-              key={mission.id}
-              className={`rounded-lg border bg-surface p-5 transition-colors ${
-                isDha
-                  ? mission.confidentiality === "top_secret"
-                    ? "border-red-800/30 hover:border-red-700/40"
-                    : "border-purple-800/30 hover:border-purple-700/40"
-                  : "border-accent-dim/20 hover:border-accent-dim/40"
-              }`}
-            >
+            <div key={mission.id} className="rounded-sm border p-5"
+              style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-semibold text-foreground">{mission.title}</h3>
-                    <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${st.color}`}>
-                      {st.icon} {st.label}
+                <div className="flex-1 min-w-0">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <h3 className="font-bold uppercase tracking-[0.1em]"
+                      style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>
+                      {mission.title}
+                    </h3>
+                    <span className="rounded-sm px-2 py-0.5 text-xs font-semibold"
+                      style={{ background: `${st?.color}20`, color: st?.color, border: `1px solid ${st?.color}40` }}>
+                      {st?.label}
                     </span>
-                    {isDha && (
-                      <span className={`text-xs font-medium uppercase tracking-wider ${
-                        mission.confidentiality === "top_secret" ? "text-red-400" : "text-purple-400"
-                      }`}>
-                        {confLabels[mission.confidentiality] || mission.confidentiality}
+                    {mission.visibility === "global" && (
+                      <span className="rounded-sm px-2 py-0.5 text-xs" style={{ color: "#6b7280", border: "1px solid #2a2a2a" }}>Hub</span>
+                    )}
+                    {isDha && mission.confidentiality !== "standard" && (
+                      <span className="rounded-sm px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.1em]"
+                        style={{ color: mission.confidentiality === "top_secret" ? "#ef4444" : "#a259e0" }}>
+                        {mission.confidentiality === "top_secret" ? "Top Secret" : "Secret"}
                       </span>
                     )}
                   </div>
                   {mission.description && (
-                    <p className="mt-2 text-sm text-foreground/60">{mission.description}</p>
+                    <p className="text-sm leading-relaxed" style={{ color: "#6b7280" }}>{mission.description}</p>
                   )}
-                  <p className="mt-2 text-xs text-foreground/30">
+                  <p className="mt-2 text-xs" style={{ color: "#3a3a3a" }}>
                     {new Date(mission.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
                   </p>
                 </div>
 
-                {mission.status === "en_cours" && (() => {
-                  const isFull = mission.maxParticipants > 0 && mission.members.length >= mission.maxParticipants && !isParticipating;
-                  return (
+                {mission.status === "en_cours" && (
                   <button
                     onClick={() => !isFull && toggleParticipation(mission.id, isParticipating)}
                     disabled={isFull}
-                    className={`shrink-0 rounded px-4 py-2 text-sm font-medium uppercase tracking-wider transition-all ${
-                      isFull ? "border border-foreground/20 text-foreground/30 cursor-not-allowed"
-                      : isParticipating
-                        ? `border ${isDha ? "border-green-700 bg-green-900/30 text-green-400" : "border-green-700 bg-green-900/30 text-green-400"} hover:bg-red-900/30 hover:text-red-400 hover:border-red-700`
-                        : `border ${isDha ? "border-purple-700 bg-purple-900/20 text-purple-300 hover:bg-purple-900/40" : "border-accent-dim/30 bg-accent/10 text-accent hover:bg-accent/20"}`
-                    }`}
-                  >
-                    {isFull ? "Complet" : isParticipating ? "✓ Participant" : "Participer"}
+                    className="shrink-0 rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      borderColor: isParticipating ? "#22c55e" : accentColor,
+                      color: isParticipating ? "#22c55e" : accentColor,
+                      background: isParticipating ? "rgba(34,197,94,0.08)" : `color-mix(in srgb, var(--clan-primary, #c9a84c) 8%, transparent)`,
+                    }}>
+                    {isFull ? "Complet" : isParticipating ? "Participant" : "Participer"}
                   </button>
-                  );
-                })()}
+                )}
               </div>
 
               {mission.members.length > 0 && (
-                <div className="mt-3 border-t border-accent-dim/10 pt-3">
-                  <span className="text-xs uppercase tracking-wider text-foreground/40">
+                <div className="mt-3 border-t pt-3" style={{ borderColor: "#1a1a1a" }}>
+                  <p className="mb-1.5 text-xs uppercase tracking-[0.15em]" style={{ color: "#3a3a3a" }}>
                     Participants ({mission.members.length}{mission.maxParticipants > 0 ? `/${mission.maxParticipants}` : ""})
-                  </span>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {mission.members.map((m) => (
-                      <span
-                        key={m.user.id}
-                        className={`rounded-full px-2.5 py-0.5 text-xs ${
-                          isDha ? "bg-purple-900/20 text-purple-300" : "bg-accent/10 text-accent"
-                        }`}
-                      >
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {mission.members.map(m => (
+                      <span key={m.user.id} className="rounded-sm px-2 py-0.5 text-xs"
+                        style={{ background: "#161616", color: "#9ca3af", border: "1px solid #222" }}>
                         {m.user.displayName}
                       </span>
                     ))}
