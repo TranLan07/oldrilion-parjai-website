@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 
 type Props = { slug: string; clanName: string };
@@ -63,7 +63,7 @@ export default function ClanNavbar({ slug, clanName }: Props) {
 
   return (
     <nav className="sticky top-0 z-50 border-b backdrop-blur-md"
-      style={{ borderColor: "var(--beskar-600)", background: "rgba(16,16,22,0.95)" }}>
+      style={{ borderColor: "var(--clan-primary, var(--beskar-600))", background: "rgba(16,16,22,0.95)" }}>
       <div className="mx-auto flex max-w-[1200px] items-center justify-between px-4 sm:px-6" style={{ height: "60px" }}>
         <div className="flex items-center gap-3">
           <Link href="/clans" className="text-xs font-semibold uppercase tracking-[0.14em] transition-colors"
@@ -84,12 +84,15 @@ export default function ClanNavbar({ slug, clanName }: Props) {
           {visiblePrivate.map(l => <li key={l.href}><NavLink {...l} /></li>)}
           <li className="ml-2">
             {session ? (
-              <button onClick={() => signOut()}
-                className="rounded-sm border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition-all"
-                style={{ fontFamily: "var(--font-display)", borderColor: "var(--beskar-500)", color: "var(--beskar-300)" }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--red-600)"; e.currentTarget.style.color = "var(--red-400)"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--beskar-500)"; e.currentTarget.style.color = "var(--beskar-300)"; }}
-              >Déconnexion</button>
+              <Link href="/profil" className="relative flex items-center justify-center rounded-full transition-all"
+                style={{ width: "34px", height: "34px", background: "#1a1a1a", border: "1px solid var(--beskar-600)", color: "var(--beskar-300)" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--clan-primary, #c9a84c)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--clan-primary, #c9a84c)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--beskar-600)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--beskar-300)"; }}
+                title="Mon profil">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                </svg>
+              </Link>
             ) : (
               <Link href="/login"
                 className="rounded-sm px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]"
@@ -119,10 +122,10 @@ export default function ClanNavbar({ slug, clanName }: Props) {
           )}
           <div className="mt-3">
             {session ? (
-              <button onClick={() => signOut()}
-                className="w-full rounded-sm border px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
+              <Link href="/profil"
+                className="block w-full rounded-sm border px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em]"
                 style={{ fontFamily: "var(--font-display)", borderColor: "var(--beskar-500)", color: "var(--beskar-300)" }}
-              >Déconnexion</button>
+              >Mon profil</Link>
             ) : (
               <Link href="/login"
                 className="block w-full rounded-sm px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em]"
