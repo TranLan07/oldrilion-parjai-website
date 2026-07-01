@@ -12,8 +12,17 @@ export default function Navbar() {
   const { data: session } = useSession();
   const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
   const [open, setOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => { setOpen(false); }, [pathname]);
+
+  useEffect(() => {
+    if (!session) return;
+    const fetchCount = () => fetch("/api/notifications/count").then(r => r.ok ? r.json() : { count: 0 }).then(d => setUnread(d.count));
+    fetchCount();
+    const t = setInterval(fetchCount, 30000);
+    return () => clearInterval(t);
+  }, [session]);
 
   const publicLinks = [
     { href: "/", label: "Hub" },
@@ -24,18 +33,26 @@ export default function Navbar() {
     { href: "/profil", label: "Profil" },
     { href: "/messagerie", label: "Messages" },
     { href: "/missions", label: "Missions" },
-    { href: "/notifications", label: "Notifications" },
+    { href: "/notifications", label: "Notifications", badge: unread > 0 ? unread : undefined },
     ...(hubRole === "admin" || hubRole === "moderator" ? [{ href: "/hub/admin", label: "Admin Hub" }] : []),
   ];
 
-  function NavLink({ href, label }: { href: string; label: string }) {
+  function NavLink({ href, label, badge }: { href: string; label: string; badge?: number }) {
     const active = pathname === href;
     return (
-      <Link href={href} className={linkStyle}
+      <Link href={href} className={`${linkStyle} relative inline-flex items-center gap-1.5`}
         style={{ fontFamily: "var(--font-display)", color: active ? "#f2f2f5" : "#9ca3af" }}
         onMouseEnter={e => { if (!active) e.currentTarget.style.color = "#e5e7eb"; }}
         onMouseLeave={e => { if (!active) e.currentTarget.style.color = "#9ca3af"; }}
-      >{label}</Link>
+      >
+        {label}
+        {badge != null && (
+          <span className="rounded-full text-xs font-bold leading-none px-1.5 py-0.5"
+            style={{ background: "#ef4444", color: "#fff", fontSize: "10px" }}>
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </Link>
     );
   }
 
@@ -51,7 +68,7 @@ export default function Navbar() {
         {/* Desktop */}
         <ul className="hidden items-center gap-0.5 lg:flex">
           {publicLinks.map(l => <li key={l.href}><NavLink {...l} /></li>)}
-          {session && privateLinks.map(l => <li key={l.href}><NavLink {...l} /></li>)}
+          {session && privateLinks.map(l => <li key={l.href}><NavLink href={l.href} label={l.label} badge={(l as {badge?: number}).badge} /></li>)}
           <li className="ml-2">
             {session ? (
               <button onClick={() => signOut()}
@@ -85,7 +102,7 @@ export default function Navbar() {
           {session && privateLinks.length > 0 && (
             <>
               <div className="my-2 h-px" style={{ background: "#2a2a2a" }} />
-              {privateLinks.map(l => <NavLink key={l.href} {...l} />)}
+              {privateLinks.map(l => <NavLink key={l.href} href={l.href} label={l.label} badge={(l as {badge?: number}).badge} />)}
             </>
           )}
           <div className="mt-3">
