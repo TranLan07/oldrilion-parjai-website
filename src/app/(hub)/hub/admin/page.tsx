@@ -8,7 +8,7 @@ type Tag = { id: string; name: string; _count: { clans: number } };
 type User = { id: string; publicId: string; username: string; displayName: string; hubRole: string; mandalorien: boolean; clanId: string | null; clan: { name: string; slug: string } | null; createdAt: string };
 type Config = Record<string, string>;
 
-const tabs = ["Clans", "Utilisateurs", "Tags", "Config", "Contacts", "Messagerie", "Missions"] as const;
+const tabs = ["Clans", "Utilisateurs", "Tags", "Config", "Contacts", "Messagerie", "Missions", "Événements"] as const;
 type Tab = typeof tabs[number];
 
 export default function HubAdminPage() {
@@ -18,6 +18,7 @@ export default function HubAdminPage() {
   type ContactMsg = { id: string; name: string; email: string; type: string; subject: string; message: string; read: boolean; createdAt: string };
   type HubChannel = { id: string; name: string; description: string; _count: { messages: number }; members: { user: { id: string; displayName: string } }[] };
   type HubMission = { id: string; title: string; description: string; status: string; maxParticipants: number; createdAt: string; clan: { name: string; slug: string; colorPrimary: string } | null };
+  type HubEvent = { id: string; title: string; description: string; status: string; hubStatus: string; startAt: string | null; _count: { members: number }; clan: { name: string; slug: string; colorPrimary: string } | null };
 
   const [tab, setTab] = useState<Tab>("Clans");
   const [clans, setClans] = useState<Clan[]>([]);
@@ -38,6 +39,9 @@ export default function HubAdminPage() {
   const [newChannelDesc, setNewChannelDesc] = useState("");
   const [hubMissions, setHubMissions] = useState<HubMission[]>([]);
   const [missionForm, setMissionForm] = useState({ title: "", description: "", maxParticipants: "0" });
+  const [hubEvents, setHubEvents] = useState<HubEvent[]>([]);
+  const [eventForm, setEventForm] = useState({ title: "", description: "", maxParticipants: "", startAt: "" });
+  const [webmasterInfo, setWebmasterInfo] = useState<Record<string, { username: string; password: string }>>({});
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(""), 3000); }
 
@@ -55,7 +59,12 @@ export default function HubAdminPage() {
     if (r.ok) setHubMissions(await r.json());
   }
 
-  useEffect(() => { loadClans(); loadTags(); loadUsers(); loadConfig(); loadContacts(); loadHubChannels(); loadHubMissions(); }, []);
+  async function loadHubEvents() {
+    const r = await fetch("/api/hub/admin/events");
+    if (r.ok) setHubEvents(await r.json());
+  }
+
+  useEffect(() => { loadClans(); loadTags(); loadUsers(); loadConfig(); loadContacts(); loadHubChannels(); loadHubMissions(); loadHubEvents(); }, []);
 
   async function loadClans() {
     const r = await fetch("/api/hub/admin/clans");
@@ -196,12 +205,31 @@ export default function HubAdminPage() {
                   <span className="text-xs" style={{ color: "#4a4a4a" }}>{clan._count.members} mbr</span>
                 </div>
                 <p className="mb-3 text-xs" style={{ color: "#4a4a4a" }}>/clan/{clan.slug}</p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <a href={`/clan/${clan.slug}`} className="text-xs px-2 py-1 rounded-sm border" style={{ borderColor: "#2a2a2a", color: "#6b7280" }}>Visiter</a>
                   <a href={`/clan/${clan.slug}/admin`} className="text-xs px-2 py-1 rounded-sm border" style={{ borderColor: "#2a2a2a", color: "#6b7280" }}>Admin clan</a>
+                  <button onClick={async () => {
+                    const r = await fetch("/api/hub/admin/clans/webmaster", {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ clanId: clan.id }),
+                    });
+                    if (r.ok) {
+                      const d = await r.json();
+                      setWebmasterInfo(prev => ({ ...prev, [clan.id]: d }));
+                    }
+                  }} className="text-xs px-2 py-1 rounded-sm border" style={{ borderColor: "#2a2a2a", color: "#c9a84c" }}>
+                    Accès webmaster
+                  </button>
                   <button onClick={() => { if (confirm(`Supprimer le clan "${clan.name}" et TOUTES ses données ?`)) deleteClan(clan.id); }}
                     className="text-xs px-2 py-1 rounded-sm" style={{ background: "rgba(192,57,43,0.1)", color: "#ef4444" }}>Supprimer</button>
                 </div>
+                {webmasterInfo[clan.id] && (
+                  <div className="mt-3 rounded-sm border px-3 py-2 text-xs space-y-0.5" style={{ borderColor: "#c9a84c30", background: "rgba(201,168,76,0.05)" }}>
+                    <p style={{ color: "#9ca3af" }}>Login : <span className="font-mono font-bold" style={{ color: "#f2f2f5" }}>{webmasterInfo[clan.id].username}</span></p>
+                    <p style={{ color: "#9ca3af" }}>Mot de passe : <span className="font-mono font-bold" style={{ color: "#f2f2f5" }}>{webmasterInfo[clan.id].password}</span></p>
+                    <p style={{ color: "#4a4a4a" }}>Nouveau mot de passe généré. Communiquez-le au webmaster.</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -431,6 +459,107 @@ export default function HubAdminPage() {
             ))}
           </div>
           <a href="/missions" className="inline-block text-sm" style={{ color: "#c9a84c" }}>Voir les missions hub →</a>
+        </div>
+      )}
+
+      {/* ── Événements hub ── */}
+      {tab === "Événements" && (
+        <div className="space-y-6">
+          <p className="text-sm" style={{ color: "#6b7280" }}>
+            Événements proposés par les clans (en attente d'approbation) et événements hub. Approuvez, rejetez ou créez des événements visibles par tous.
+          </p>
+
+          {/* Événements en attente */}
+          {hubEvents.filter(e => e.hubStatus === "pending").length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "#c9a84c" }}>
+                En attente ({hubEvents.filter(e => e.hubStatus === "pending").length})
+              </h3>
+              {hubEvents.filter(e => e.hubStatus === "pending").map(ev => (
+                <div key={ev.id} className="rounded-sm border p-4 flex items-start justify-between gap-3"
+                  style={{ borderColor: "#c9a84c30", background: "rgba(201,168,76,0.04)" }}>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="font-bold text-sm" style={{ color: "#f2f2f5" }}>{ev.title}</span>
+                      {ev.clan && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-sm" style={{ color: ev.clan.colorPrimary, border: `1px solid ${ev.clan.colorPrimary}40` }}>{ev.clan.name}</span>}
+                      {ev.startAt && <span className="text-xs" style={{ color: "#4a4a4a" }}>{new Date(ev.startAt).toLocaleDateString("fr-FR")}</span>}
+                    </div>
+                    {ev.description && <p className="text-xs" style={{ color: "#6b7280" }}>{ev.description}</p>}
+                    <p className="mt-1 text-xs" style={{ color: "#4a4a4a" }}>{ev._count.members} inscrits</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={async () => {
+                      await fetch("/api/hub/admin/events", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.id, hubStatus: "approved" }) });
+                      loadHubEvents(); flash("Événement approuvé.");
+                    }} className="text-xs px-3 py-1.5 rounded-sm" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                      Approuver
+                    </button>
+                    <button onClick={async () => {
+                      await fetch("/api/hub/admin/events", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.id }) });
+                      loadHubEvents(); flash("Événement rejeté.");
+                    }} className="text-xs px-3 py-1.5 rounded-sm" style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>
+                      Rejeter
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Créer événement hub */}
+          <div className="rounded-sm border p-4 space-y-3" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "#4a4a4a" }}>Nouvel événement hub</h3>
+            <div className="flex flex-wrap gap-2">
+              <input value={eventForm.title} onChange={e => setEventForm(f => ({ ...f, title: e.target.value }))}
+                className="rounded-sm border px-3 py-2 text-sm outline-none w-56" style={inputStyle} placeholder="Titre" />
+              <input value={eventForm.description} onChange={e => setEventForm(f => ({ ...f, description: e.target.value }))}
+                className="rounded-sm border px-3 py-2 text-sm outline-none w-72" style={inputStyle} placeholder="Description" />
+              <input type="number" value={eventForm.maxParticipants} onChange={e => setEventForm(f => ({ ...f, maxParticipants: e.target.value }))}
+                className="rounded-sm border px-3 py-2 text-sm outline-none w-28" style={inputStyle} placeholder="Max (0=∞)" min="0" />
+              <input type="datetime-local" value={eventForm.startAt} onChange={e => setEventForm(f => ({ ...f, startAt: e.target.value }))}
+                className="rounded-sm border px-3 py-2 text-sm outline-none" style={inputStyle} />
+              <button onClick={async () => {
+                if (!eventForm.title.trim()) return;
+                await fetch("/api/hub/admin/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(eventForm) });
+                setEventForm({ title: "", description: "", maxParticipants: "", startAt: "" }); loadHubEvents(); flash("Événement créé.");
+              }} className="rounded-sm px-4 py-2 text-sm font-semibold" style={{ background: "#f2f2f5", color: "#000" }}>
+                Créer
+              </button>
+            </div>
+          </div>
+
+          {/* Événements approuvés */}
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "#4a4a4a" }}>
+              Approuvés ({hubEvents.filter(e => e.hubStatus === "approved").length})
+            </h3>
+            {hubEvents.filter(e => e.hubStatus === "approved").length === 0 && (
+              <p className="text-sm" style={{ color: "#3a3a3a" }}>Aucun événement approuvé.</p>
+            )}
+            {hubEvents.filter(e => e.hubStatus === "approved").map(ev => (
+              <div key={ev.id} className="rounded-sm border p-4 flex items-start justify-between gap-3" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="font-bold text-sm" style={{ color: "#f2f2f5" }}>{ev.title}</span>
+                    {ev.clan ? (
+                      <span className="text-xs font-semibold px-1.5 py-0.5 rounded-sm" style={{ color: ev.clan.colorPrimary, border: `1px solid ${ev.clan.colorPrimary}40` }}>{ev.clan.name}</span>
+                    ) : (
+                      <span className="text-xs px-1.5 py-0.5 rounded-sm" style={{ color: "#6b7280", border: "1px solid #2a2a2a" }}>Hub</span>
+                    )}
+                    <span className="text-xs" style={{ color: "#22c55e" }}>✓ Approuvé</span>
+                  </div>
+                  {ev.description && <p className="text-xs" style={{ color: "#6b7280" }}>{ev.description}</p>}
+                </div>
+                <button onClick={async () => {
+                  await fetch("/api/hub/admin/events", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ev.id }) });
+                  loadHubEvents(); flash(ev.clan ? "Événement retiré du hub." : "Événement supprimé.");
+                }} className="text-xs px-3 py-1.5 rounded-sm shrink-0" style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>
+                  {ev.clan ? "Retirer" : "Supprimer"}
+                </button>
+              </div>
+            ))}
+          </div>
+          <a href="/evenements" className="inline-block text-sm" style={{ color: "#c9a84c" }}>Voir les événements hub →</a>
         </div>
       )}
 

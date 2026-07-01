@@ -30,11 +30,10 @@ export default function Navbar() {
   ];
 
   const privateLinks = [
-    { href: "/profil", label: "Profil" },
     { href: "/messagerie", label: "Messages" },
     { href: "/missions", label: "Missions" },
+    { href: "/evenements", label: "Événements" },
     { href: "/traducteur", label: "Mando'a" },
-    { href: "/notifications", label: "Notifications", badge: unread > 0 ? unread : undefined },
     ...(hubRole === "admin" || hubRole === "moderator" ? [{ href: "/hub/admin", label: "Admin Hub" }] : []),
   ];
 
@@ -72,12 +71,21 @@ export default function Navbar() {
           {session && privateLinks.map(l => <li key={l.href}><NavLink href={l.href} label={l.label} badge={(l as {badge?: number}).badge} /></li>)}
           <li className="ml-2">
             {session ? (
-              <button onClick={() => signOut()}
-                className="rounded-sm border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition-all"
-                style={{ fontFamily: "var(--font-display)", borderColor: "#3a3a3a", color: "#9ca3af" }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.color = "#fca5a5"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "#3a3a3a"; e.currentTarget.style.color = "#9ca3af"; }}
-              >Déconnexion</button>
+              <Link href="/profil" className="relative flex items-center justify-center rounded-full transition-all"
+                style={{ width: "34px", height: "34px", background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#9ca3af" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "#f2f2f5"; (e.currentTarget as HTMLAnchorElement).style.color = "#f2f2f5"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "#2a2a2a"; (e.currentTarget as HTMLAnchorElement).style.color = "#9ca3af"; }}
+                title="Mon profil">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                </svg>
+                {unread > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold leading-none"
+                    style={{ background: "#ef4444", color: "#fff", fontSize: "9px" }}>
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </Link>
             ) : (
               <Link href="/login"
                 className="rounded-sm border px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition-all"
@@ -106,12 +114,12 @@ export default function Navbar() {
               {privateLinks.map(l => <NavLink key={l.href} href={l.href} label={l.label} badge={(l as {badge?: number}).badge} />)}
             </>
           )}
-          <div className="mt-3">
+          <div className="mt-3 flex flex-col gap-2">
             {session ? (
-              <button onClick={() => signOut()}
-                className="w-full rounded-sm border px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
-                style={{ fontFamily: "var(--font-display)", borderColor: "#3a3a3a", color: "#9ca3af" }}
-              >Déconnexion</button>
+              <Link href="/profil"
+                className="block w-full rounded-sm border px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em]"
+                style={{ fontFamily: "var(--font-display)", borderColor: "#2a2a2a", color: "#9ca3af" }}
+              >Mon profil {unread > 0 && `(${unread})`}</Link>
             ) : (
               <Link href="/login"
                 className="block w-full rounded-sm border px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em]"

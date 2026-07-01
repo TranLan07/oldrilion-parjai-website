@@ -37,14 +37,17 @@ export default function ClanNavbar({ slug, clanName }: Props) {
   ];
 
   const privateLinks = [
+    { href: `/profil`, label: "Profil", minPerm: 1 },
     { href: `${base}/messagerie`, label: "Messages", minPerm: 1 },
     { href: `${base}/missions`, label: "Missions", minPerm: 1 },
     { href: `${base}/evenements`, label: "Evenements", minPerm: 1 },
     { href: `${base}/admin`, label: "Admin", minPerm: 10 },
   ];
 
+  const isAdmin = hubRole === "admin" || (sessionClanSlug === slug && (perm ?? 0) >= 10);
+
   const visiblePrivate = effectivePerm > 0
-    ? privateLinks.filter(l => effectivePerm >= l.minPerm || (l.minPerm === 10 && (hubRole === "admin" || sessionClanSlug === slug)))
+    ? privateLinks.filter(l => l.minPerm < 10 ? effectivePerm >= l.minPerm : isAdmin)
     : [];
 
   function NavLink({ href, label }: { href: string; label: string }) {

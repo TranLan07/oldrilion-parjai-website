@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type WordResult = { original: string; translated: string; found: boolean };
 type TranslationResult = {
@@ -80,6 +81,13 @@ export default function TraducteurPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-16">
+      <Link href="/profil" className="mb-6 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] transition-colors"
+        style={{ color: "#4a4a4a" }}
+        onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#9ca3af"; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#4a4a4a"; }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Profil
+      </Link>
       <p className="mb-1 text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: "#4a4a4a" }}>Hub</p>
       <h1 className="mb-2 text-4xl font-bold uppercase tracking-[0.14em]"
         style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>Traducteur Mando&apos;a</h1>

@@ -59,6 +59,9 @@ export async function PUT(req: NextRequest, { params }: P) {
       ...(data.specializationId !== undefined && { specializationId: data.specializationId || null }),
       ...(data.maxParticipants !== undefined && { maxParticipants: data.maxParticipants ? Number(data.maxParticipants) : null }),
       ...(data.startAt !== undefined && { startAt: data.startAt ? new Date(data.startAt) : null }),
+      // Proposer au Hub : passe hubStatus en "pending" (doit être approuvé par admin hub)
+      ...(data.proposeHub === true && { hubStatus: "pending" }),
+      ...(data.proposeHub === false && { hubStatus: "none" }),
     },
   });
   return NextResponse.json(event);

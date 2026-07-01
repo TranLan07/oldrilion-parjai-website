@@ -1063,7 +1063,7 @@ function TagsTab({ slug }: { slug: string }) {
 
 // -- EvenementsTab --
 function EvenementsTab({ slug }: { slug: string }) {
-  type AdminEvent = { id: string; title: string; status: string; visibility: string; _count: { members: number } };
+  type AdminEvent = { id: string; title: string; status: string; visibility: string; hubStatus: string; _count: { members: number } };
   const [events, setEvents] = useState<AdminEvent[]>([]);
   const [form, setForm] = useState({ title: "", description: "", status: "a_venir", visibility: "internal", maxParticipants: "", startAt: "" });
 
@@ -1118,8 +1118,26 @@ function EvenementsTab({ slug }: { slug: string }) {
             <div>
               <p className="font-semibold text-sm text-foreground">{ev.title}</p>
               <p className="text-xs text-foreground/40">{ev.status} · {ev.visibility} · {ev._count.members} participants</p>
+              {ev.hubStatus !== "none" && (
+                <p className="text-xs" style={{ color: ev.hubStatus === "approved" ? "#22c55e" : "#c9a84c" }}>
+                  Hub: {ev.hubStatus === "approved" ? "Approuvé ✓" : "En attente..."}
+                </p>
+              )}
             </div>
-            <button onClick={() => del(ev.id)} className={btnDanger}>Supprimer</button>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: ev.hubStatus !== "none" ? "#c9a84c" : "var(--clan-primary)" }}>
+                <input type="checkbox" checked={ev.hubStatus !== "none"}
+                  onChange={async (e) => {
+                    await fetch(`/api/clan/${slug}/admin/evenements`, {
+                      method: "PUT", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ id: ev.id, proposeHub: e.target.checked }),
+                    });
+                    loadEv();
+                  }} />
+                Hub
+              </label>
+              <button onClick={() => del(ev.id)} className={btnDanger}>Supprimer</button>
+            </div>
           </div>
         ))}
       </div>

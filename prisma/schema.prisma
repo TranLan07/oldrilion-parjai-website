@@ -95,6 +95,8 @@ model User {
   mustChangePassword  Boolean         @default(false)
   anonymous           Boolean         @default(false)
   mandalorien         Boolean         @default(false)  // tag mandalorien : auto si dans un clan, manuel sinon
+  notifMissions       String          @default("all")  // "all" | "clan_only" | "global_only" | "none"
+  notifEvents         String          @default("all")  // "all" | "clan_only" | "global_only" | "none"
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
@@ -214,7 +216,8 @@ model ChannelMember {
   id        String  @id @default(cuid())
   userId    String
   channelId String
-  muted     Boolean @default(false)
+  muted         Boolean @default(false)
+  inAppNotif    Boolean @default(true)
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
   @@unique([userId, channelId])
@@ -285,6 +288,7 @@ model Event {
   specialization   Specialization? @relation(fields: [specializationId], references: [id])
   maxParticipants  Int?
   startAt          DateTime?
+  hubStatus        String   @default("none")  // "none" | "pending" | "approved"
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   members          EventMember[]
