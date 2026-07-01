@@ -8,7 +8,7 @@ type Tag = { id: string; name: string; _count: { clans: number } };
 type User = { id: string; publicId: string; username: string; displayName: string; hubRole: string; mandalorien: boolean; clanId: string | null; clan: { name: string; slug: string } | null; createdAt: string };
 type Config = Record<string, string>;
 
-const tabs = ["Clans", "Utilisateurs", "Tags", "Config", "Contacts", "Messagerie", "Missions", "Événements"] as const;
+const tabs = ["Clans", "Utilisateurs", "Tags", "Config", "Contacts", "Messagerie", "Missions", "Événements", "Dictionnaire"] as const;
 type Tab = typeof tabs[number];
 
 export default function HubAdminPage() {
@@ -42,6 +42,14 @@ export default function HubAdminPage() {
   const [hubEvents, setHubEvents] = useState<HubEvent[]>([]);
   const [eventForm, setEventForm] = useState({ title: "", description: "", maxParticipants: "", startAt: "" });
   const [webmasterInfo, setWebmasterInfo] = useState<Record<string, { username: string; password: string }>>({});
+  type DictEntry = { id: string; french: string; mandoa: string };
+  const [dictEntries, setDictEntries] = useState<DictEntry[]>([]);
+  const [dictSearch, setDictSearch] = useState("");
+  const [dictShowForm, setDictShowForm] = useState(false);
+  const [dictForm, setDictForm] = useState({ french: "", mandoa: "" });
+  const [dictEditing, setDictEditing] = useState<DictEntry | null>(null);
+  const [dictDeleting, setDictDeleting] = useState<string | null>(null);
+  const [dictConflict, setDictConflict] = useState<{ existing: DictEntry; newMandoa: string } | null>(null);
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(""), 3000); }
 
@@ -64,7 +72,12 @@ export default function HubAdminPage() {
     if (r.ok) setHubEvents(await r.json());
   }
 
-  useEffect(() => { loadClans(); loadTags(); loadUsers(); loadConfig(); loadContacts(); loadHubChannels(); loadHubMissions(); loadHubEvents(); }, []);
+  async function loadDict() {
+    const r = await fetch("/api/hub/admin/dictionary");
+    if (r.ok) setDictEntries(await r.json());
+  }
+
+  useEffect(() => { loadClans(); loadTags(); loadUsers(); loadConfig(); loadContacts(); loadHubChannels(); loadHubMissions(); loadHubEvents(); loadDict(); }, []);
 
   async function loadClans() {
     const r = await fetch("/api/hub/admin/clans");
@@ -602,6 +615,150 @@ export default function HubAdminPage() {
           <a href="/evenements" className="inline-block text-sm" style={{ color: "#c9a84c" }}>Voir les événements hub →</a>
         </div>
       )}
+
+      {/* ── Dictionnaire ── */}
+      {tab === "Dictionnaire" && (() => {
+        const filtered = dictSearch
+          ? dictEntries.filter(e => e.french.includes(dictSearch.toLowerCase()) || e.mandoa.toLowerCase().includes(dictSearch.toLowerCase()))
+          : dictEntries;
+
+        async function dictCreate() {
+          if (!dictForm.french.trim() || !dictForm.mandoa.trim()) return;
+          const res = await fetch("/api/hub/admin/dictionary", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ french: dictForm.french, mandoa: dictForm.mandoa }),
+          });
+          if (res.status === 409) {
+            const data = await res.json();
+            setDictConflict({ existing: data.existing, newMandoa: dictForm.mandoa.trim() });
+            return;
+          }
+          setDictForm({ french: "", mandoa: "" }); setDictShowForm(false); loadDict();
+        }
+
+        async function dictForceReplace() {
+          if (!dictConflict) return;
+          await fetch("/api/hub/admin/dictionary", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ french: dictConflict.existing.french, mandoa: dictConflict.newMandoa, force: true }),
+          });
+          setDictConflict(null); setDictForm({ french: "", mandoa: "" }); setDictShowForm(false); loadDict();
+        }
+
+        async function dictSaveEdit() {
+          if (!dictEditing) return;
+          await fetch("/api/hub/admin/dictionary", {
+            method: "PUT", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: dictEditing.id, french: dictEditing.french, mandoa: dictEditing.mandoa }),
+          });
+          setDictEditing(null); loadDict();
+        }
+
+        async function dictDelete(id: string) {
+          await fetch("/api/hub/admin/dictionary", {
+            method: "DELETE", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id }),
+          });
+          setDictDeleting(null); loadDict();
+        }
+
+        return (
+          <div className="space-y-4">
+            {dictConflict && (
+              <div className="rounded-sm border-2 p-5 space-y-3" style={{ borderColor: "#78350f", background: "#78350f20" }}>
+                <h3 className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "#fbbf24" }}>Conflit détecté</h3>
+                <p className="text-sm" style={{ color: "#d1d5db" }}>
+                  Le mot <strong style={{ color: "#c9a84c" }}>&quot;{dictConflict.existing.french}&quot;</strong> existe déjà avec <strong style={{ color: "#c9a84c" }}>&quot;{dictConflict.existing.mandoa}&quot;</strong>.
+                </p>
+                <p className="text-sm" style={{ color: "#9ca3af" }}>
+                  Remplacer par <strong style={{ color: "#fbbf24" }}>&quot;{dictConflict.newMandoa}&quot;</strong> ?
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={dictForceReplace} className="rounded-sm px-4 py-1.5 text-sm font-semibold" style={{ background: "#92400e", color: "#fff" }}>Remplacer</button>
+                  <button onClick={() => setDictConflict(null)} className="rounded-sm px-3 py-1.5 text-sm" style={{ background: "#1a1a1a", color: "#9ca3af" }}>Annuler</button>
+                </div>
+              </div>
+            )}
+
+            {dictShowForm ? (
+              <div className="rounded-sm border p-5 space-y-3" style={{ borderColor: "#c9a84c40", background: "#0d0d0d" }}>
+                <h3 className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "#c9a84c" }}>Ajouter un mot</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs" style={{ color: "#6b7280" }}>Français</label>
+                    <input value={dictForm.french} onChange={e => setDictForm({ ...dictForm, french: e.target.value })}
+                      className="w-full rounded-sm border px-3 py-2 text-sm outline-none" style={inputStyle} placeholder="Ex: courage" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs" style={{ color: "#6b7280" }}>Mando&apos;a</label>
+                    <input value={dictForm.mandoa} onChange={e => setDictForm({ ...dictForm, mandoa: e.target.value })}
+                      className="w-full rounded-sm border px-3 py-2 text-sm outline-none" style={inputStyle} placeholder="Ex: mirshko"
+                      onKeyDown={e => { if (e.key === "Enter") dictCreate(); }} />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={dictCreate} className="rounded-sm px-4 py-1.5 text-sm font-semibold" style={{ background: "#166534", color: "#fff" }}>Ajouter</button>
+                  <button onClick={() => { setDictShowForm(false); setDictConflict(null); }} className="rounded-sm px-3 py-1.5 text-sm" style={{ background: "#1a1a1a", color: "#9ca3af" }}>Annuler</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <button onClick={() => setDictShowForm(true)} className="rounded-sm px-5 py-2 text-sm font-semibold uppercase tracking-[0.1em]"
+                  style={{ background: "#c9a84c", color: "#000" }}>+ Ajouter un mot</button>
+                <span className="text-sm" style={{ color: "#3a3a3a" }}>{dictEntries.length} mot(s)</span>
+              </div>
+            )}
+
+            {dictEntries.length > 0 && (
+              <input value={dictSearch} onChange={e => setDictSearch(e.target.value)}
+                placeholder="Rechercher un mot..." className="rounded-sm border px-3 py-2 text-sm outline-none w-full max-w-sm" style={inputStyle} />
+            )}
+
+            {filtered.length === 0 && dictEntries.length > 0 && dictSearch && (
+              <p className="text-sm" style={{ color: "#3a3a3a" }}>Aucun résultat pour &quot;{dictSearch}&quot;</p>
+            )}
+
+            <div className="space-y-2">
+              {filtered.map(e => (
+                <div key={e.id} className="rounded-sm border px-4 py-3 flex items-center justify-between" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
+                  {dictEditing?.id === e.id ? (
+                    <div className="flex flex-1 items-center gap-2">
+                      <input value={dictEditing.french} onChange={ev => setDictEditing({ ...dictEditing, french: ev.target.value })}
+                        className="flex-1 rounded-sm border px-3 py-1.5 text-sm outline-none" style={inputStyle} />
+                      <span style={{ color: "#3a3a3a" }}>→</span>
+                      <input value={dictEditing.mandoa} onChange={ev => setDictEditing({ ...dictEditing, mandoa: ev.target.value })}
+                        className="flex-1 rounded-sm border px-3 py-1.5 text-sm outline-none" style={inputStyle}
+                        onKeyDown={ev => { if (ev.key === "Enter") dictSaveEdit(); }} />
+                      <button onClick={dictSaveEdit} className="rounded-sm px-3 py-1.5 text-xs font-semibold" style={{ background: "#166534", color: "#fff" }}>OK</button>
+                      <button onClick={() => setDictEditing(null)} className="rounded-sm px-3 py-1.5 text-xs" style={{ background: "#1a1a1a", color: "#9ca3af" }}>Annuler</button>
+                    </div>
+                  ) : dictDeleting === e.id ? (
+                    <div className="flex flex-1 items-center justify-between">
+                      <p className="text-sm" style={{ color: "#f87171" }}>Supprimer <strong>{e.french}</strong> → <strong>{e.mandoa}</strong> ?</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => dictDelete(e.id)} className="rounded-sm px-3 py-1.5 text-xs" style={{ background: "rgba(239,68,68,0.15)", color: "#ef4444" }}>Confirmer</button>
+                        <button onClick={() => setDictDeleting(null)} className="rounded-sm px-3 py-1.5 text-xs" style={{ background: "#1a1a1a", color: "#9ca3af" }}>Annuler</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm" style={{ color: "#f2f2f5" }}>{e.french}</span>
+                        <span style={{ color: "#3a3a3a" }}>→</span>
+                        <span className="font-medium text-sm" style={{ color: "#c9a84c" }}>{e.mandoa}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setDictEditing(e)} className="rounded-sm px-3 py-1.5 text-xs" style={{ background: "#1a1a1a", color: "#9ca3af" }}>Modifier</button>
+                        <button onClick={() => setDictDeleting(e.id)} className="rounded-sm px-3 py-1.5 text-xs" style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>Supprimer</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Contacts ── */}
       {tab === "Contacts" && (() => {

@@ -16,7 +16,7 @@ export default function RecrutementPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
         <h1 className="text-2xl font-bold text-accent">Vous êtes déjà membre</h1>
-        <p className="mt-2 text-foreground/50">Vous faites déjà partie du clan Parjai.</p>
+        <p className="mt-2 text-foreground/50">Vous faites déjà partie de ce clan.</p>
         <Link href="/profil" className="mt-6 rounded bg-accent px-6 py-2 font-medium uppercase text-background hover:bg-accent-dim">
           Voir mon profil
         </Link>
@@ -41,7 +41,7 @@ export default function RecrutementPage() {
     <div className="mx-auto max-w-2xl px-6 py-24">
       <h1 className="mb-4 text-4xl font-bold tracking-widest text-accent">RECRUTEMENT</h1>
       <p className="mb-12 text-foreground/60">
-        Tu veux rejoindre les rangs de Parjai ? Remplis ce formulaire et un officier te contactera.
+        Tu veux rejoindre ce clan ? Remplis ce formulaire et un officier te contactera.
       </p>
 
       {submitted ? (
@@ -74,7 +74,7 @@ export default function RecrutementPage() {
               className={`resize-none ${inputClass}`} />
           </div>
           <div>
-            <label className="mb-2 block text-sm uppercase tracking-wider text-foreground/70">Pourquoi Parjai ?</label>
+            <label className="mb-2 block text-sm uppercase tracking-wider text-foreground/70">Motivation</label>
             <textarea rows={4} required value={form.motivation} onChange={(e) => setForm({ ...form, motivation: e.target.value })}
               className={`resize-none ${inputClass}`} />
           </div>

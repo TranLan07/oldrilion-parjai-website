@@ -13,10 +13,9 @@ type Mission = { id: string; title: string; description: string; status: string;
 type PagePerm = { id: string; path: string; label: string; minPermission: number };
 type ContentSection = { id: string; order: number; title: string; description: string };
 type Grade = { id: string; name: string; defaultPermission: number; order: number; _count: { users: number } };
-type DictEntry = { id: string; french: string; mandoa: string };
 type Spec = { id: string; name: string; description: string; defaultPermission: number; secret: boolean; order: number; _count: { users: number } };
 
-type Tab = "users" | "recruitment" | "channels" | "missions" | "evenements" | "pages" | "lore" | "rules" | "grades" | "specs" | "dictionary" | "tags" | "whitelist" | "theme" | "settings";
+type Tab = "users" | "recruitment" | "channels" | "missions" | "evenements" | "pages" | "lore" | "rules" | "grades" | "specs" | "tags" | "whitelist" | "theme" | "settings";
 
 const inp = "w-full rounded border border-accent-dim/30 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent";
 const btnDanger = "rounded bg-red-900/30 px-3 py-1.5 text-sm text-red-400 hover:bg-red-900/50";
@@ -41,13 +40,12 @@ export default function AdminPage() {
   const [loreSections, setLoreSections] = useState<ContentSection[]>([]);
   const [ruleSections, setRuleSections] = useState<ContentSection[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
-  const [dictEntries, setDictEntries] = useState<DictEntry[]>([]);
   const [specs, setSpecs] = useState<Spec[]>([]);
 
   const apiMap: Record<Tab, string> = {
     users: "/api/clan/${slug}/admin/users", recruitment: "/api/clan/${slug}/admin/recruitment", channels: "/api/clan/${slug}/admin/channels",
     missions: "/api/clan/${slug}/admin/missions", evenements: "/api/clan/${slug}/admin/evenements", pages: "/api/clan/${slug}/admin/pages",
-    lore: "/api/clan/${slug}/admin/lore", rules: "/api/clan/${slug}/admin/rules", grades: "/api/clan/${slug}/admin/grades", specs: "/api/clan/${slug}/admin/specializations", dictionary: "/api/clan/${slug}/admin/dictionary", tags: "/api/clan/${slug}/admin/tags",
+    lore: "/api/clan/${slug}/admin/lore", rules: "/api/clan/${slug}/admin/rules", grades: "/api/clan/${slug}/admin/grades", specs: "/api/clan/${slug}/admin/specializations", tags: "/api/clan/${slug}/admin/tags",
     whitelist: "/api/clan/${slug}/admin/whitelist", theme: "/api/clan/${slug}/admin/settings", settings: "/api/clan/${slug}/admin/settings",
   };
 
@@ -61,7 +59,6 @@ export default function AdminPage() {
       whitelist: () => {}, theme: () => {}, settings: () => {},
       pages: (d) => setPages(d as PagePerm[]), lore: (d) => setLoreSections(d as ContentSection[]),
       rules: (d) => setRuleSections(d as ContentSection[]), grades: (d) => setGrades(d as Grade[]),
-      dictionary: (d) => setDictEntries(d as DictEntry[]),
       specs: (d) => setSpecs(d as Spec[]),
       tags: () => {},
     };
@@ -95,7 +92,7 @@ export default function AdminPage() {
     { key: "grades", label: "Grades" }, { key: "channels", label: "Canaux" },
     { key: "missions", label: "Missions" }, { key: "evenements", label: "Evenements" }, { key: "lore", label: "Lore" },
     { key: "rules", label: "Règles" }, { key: "specs", label: "Spécialisations" },
-    { key: "dictionary", label: "Dictionnaire" }, { key: "pages", label: "Permissions" }, { key: "tags", label: "Tags" },
+    { key: "pages", label: "Permissions" }, { key: "tags", label: "Tags" },
     { key: "whitelist", label: "Whitelist" }, { key: "theme", label: "Theme" }, { key: "settings", label: "Parametres" },
   ];
 
@@ -122,7 +119,6 @@ export default function AdminPage() {
       {tab === "lore" && <ContentTab sections={loreSections} endpoint="/api/clan/${slug}/admin/lore" label="Lore" api={api} />}
       {tab === "rules" && <ContentTab sections={ruleSections} endpoint="/api/clan/${slug}/admin/rules" label="Règle" api={api} />}
       {tab === "specs" && <SpecsTab specs={specs} api={api} />}
-      {tab === "dictionary" && <DictionaryTab entries={dictEntries} load={load} />}
       {tab === "pages" && <PagesTab pages={pages} api={api} />}
       {tab === "tags" && <TagsTab slug={slug} />}
     </div>
@@ -740,158 +736,6 @@ function PagesTab({ pages, api }: { pages: PagePerm[]; api: (e: string, m: strin
           )}
         </div>
       ))}
-    </div>
-  );
-}
-
-// ── Dictionary ──
-function DictionaryTab({ entries, load }: { entries: DictEntry[]; load: () => void }) {
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ french: "", mandoa: "" });
-  const [editing, setEditing] = useState<DictEntry | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [conflict, setConflict] = useState<{ existing: DictEntry; newMandoa: string } | null>(null);
-  const [search, setSearch] = useState("");
-
-  const filtered = search
-    ? entries.filter(e => e.french.includes(search.toLowerCase()) || e.mandoa.toLowerCase().includes(search.toLowerCase()))
-    : entries;
-
-  async function create() {
-    if (!form.french.trim() || !form.mandoa.trim()) return;
-    const res = await fetch("/api/clan/${slug}/admin/dictionary", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ french: form.french, mandoa: form.mandoa }),
-    });
-    if (res.status === 409) {
-      const data = await res.json();
-      setConflict({ existing: data.existing, newMandoa: form.mandoa.trim() });
-      return;
-    }
-    setForm({ french: "", mandoa: "" });
-    setShowForm(false);
-    load();
-  }
-
-  async function forceReplace() {
-    if (!conflict) return;
-    await fetch("/api/clan/${slug}/admin/dictionary", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ french: conflict.existing.french, mandoa: conflict.newMandoa, force: true }),
-    });
-    setConflict(null);
-    setForm({ french: "", mandoa: "" });
-    setShowForm(false);
-    load();
-  }
-
-  async function saveEdit() {
-    if (!editing) return;
-    await fetch("/api/clan/${slug}/admin/dictionary", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: editing.id, french: editing.french, mandoa: editing.mandoa }),
-    });
-    setEditing(null);
-    load();
-  }
-
-  async function deleteEntry(id: string) {
-    await fetch("/api/clan/${slug}/admin/dictionary", {
-      method: "DELETE", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    setDeleting(null);
-    load();
-  }
-
-  return (
-    <div className="space-y-4">
-      {conflict && (
-        <div className="rounded-lg border-2 border-yellow-600/50 bg-yellow-900/20 p-5 space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-yellow-400">Conflit détecté</h3>
-          <p className="text-sm text-foreground/80">
-            Le mot <strong className="text-accent">&quot;{conflict.existing.french}&quot;</strong> existe déjà avec la traduction <strong className="text-accent">&quot;{conflict.existing.mandoa}&quot;</strong>.
-          </p>
-          <p className="text-sm text-foreground/60">
-            Voulez-vous le remplacer par <strong className="text-yellow-300">&quot;{conflict.newMandoa}&quot;</strong> ?
-          </p>
-          <div className="flex gap-2">
-            <button onClick={forceReplace} className="rounded bg-yellow-700 px-4 py-1.5 text-sm text-white hover:bg-yellow-600">Remplacer</button>
-            <button onClick={() => setConflict(null)} className={btnSecondary}>Annuler</button>
-          </div>
-        </div>
-      )}
-
-      {showForm ? (
-        <div className="rounded-lg border border-accent/30 bg-surface p-5 space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-accent">Ajouter un mot</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs text-foreground/50">Français</label>
-              <input value={form.french} onChange={(e) => setForm({ ...form, french: e.target.value })} className={inp} placeholder="Ex: courage" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-foreground/50">Mando&apos;a</label>
-              <input value={form.mandoa} onChange={(e) => setForm({ ...form, mandoa: e.target.value })} className={inp} placeholder="Ex: mirshko"
-                onKeyDown={(e) => { if (e.key === "Enter") create(); }} />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={create} className={btnGreen}>Ajouter</button>
-            <button onClick={() => { setShowForm(false); setConflict(null); }} className={btnSecondary}>Annuler</button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center gap-3">
-          <button onClick={() => setShowForm(true)} className={btnPrimary}>+ Ajouter un mot</button>
-          <span className="text-sm text-foreground/40">{entries.length} mot(s) personnalisé(s)</span>
-        </div>
-      )}
-
-      {entries.length > 0 && (
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher un mot..." className={`${inp} max-w-sm`} />
-      )}
-
-      {filtered.length === 0 && entries.length > 0 && search && (
-        <p className="text-sm text-foreground/40">Aucun résultat pour &quot;{search}&quot;</p>
-      )}
-
-      <div className="space-y-2">
-        {filtered.map((e) => (
-          <div key={e.id} className="flex items-center justify-between rounded-lg border border-accent-dim/20 bg-surface px-4 py-3">
-            {editing?.id === e.id ? (
-              <div className="flex flex-1 items-center gap-2">
-                <input value={editing.french} onChange={(ev) => setEditing({ ...editing, french: ev.target.value })} className={`flex-1 ${inp}`} />
-                <span className="text-foreground/30">→</span>
-                <input value={editing.mandoa} onChange={(ev) => setEditing({ ...editing, mandoa: ev.target.value })} className={`flex-1 ${inp}`}
-                  onKeyDown={(ev) => { if (ev.key === "Enter") saveEdit(); }} />
-                <button onClick={saveEdit} className={btnGreen}>OK</button>
-                <button onClick={() => setEditing(null)} className={btnSecondary}>Annuler</button>
-              </div>
-            ) : deleting === e.id ? (
-              <div className="flex flex-1 items-center justify-between">
-                <p className="text-sm text-red-400">Supprimer <strong>{e.french}</strong> → <strong>{e.mandoa}</strong> ?</p>
-                <div className="flex gap-2">
-                  <button onClick={() => deleteEntry(e.id)} className={btnDanger}>Confirmer</button>
-                  <button onClick={() => setDeleting(null)} className={btnSecondary}>Annuler</button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-foreground">{e.french}</span>
-                  <span className="text-foreground/30">→</span>
-                  <span className="font-medium text-accent">{e.mandoa}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setEditing(e)} className={btnSecondary}>Modifier</button>
-                  <button onClick={() => setDeleting(e.id)} className={btnDanger}>Supprimer</button>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

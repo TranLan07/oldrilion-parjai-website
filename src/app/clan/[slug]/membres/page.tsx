@@ -35,11 +35,11 @@ export default function MembresPage() {
             <thead>
               <tr style={{ background: "var(--beskar-700)" }}>
                 <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.22em]"
-                  style={{ fontFamily: "var(--font-display)", color: "var(--gold-500)" }}>Nom</th>
+                  style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #c9a84c)" }}>Nom</th>
                 <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.22em]"
-                  style={{ fontFamily: "var(--font-display)", color: "var(--gold-500)" }}>Grade</th>
+                  style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #c9a84c)" }}>Grade</th>
                 <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.22em]"
-                  style={{ fontFamily: "var(--font-display)", color: "var(--gold-500)" }}>Spécialisation</th>
+                  style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #c9a84c)" }}>Spécialisation</th>
               </tr>
             </thead>
             <tbody>
@@ -67,9 +67,9 @@ export default function MembresPage() {
                     <span className="rounded-sm px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]"
                       style={{
                         fontFamily: "var(--font-display)",
-                        background: "rgba(201,168,76,0.1)",
-                        color: "var(--gold-500)",
-                        border: "1px solid rgba(201,168,76,0.2)",
+                        background: "color-mix(in srgb, var(--clan-primary, #c9a84c) 10%, transparent)",
+                        color: "var(--clan-primary, #c9a84c)",
+                        border: "1px solid color-mix(in srgb, var(--clan-primary, #c9a84c) 20%, transparent)",
                       }}>
                       {m.specialization}
                     </span>
@@ -82,7 +82,7 @@ export default function MembresPage() {
       )}
 
       <p className="mt-6 text-xs" style={{ color: "var(--beskar-400)" }}>
-        {members.length} membre{members.length > 1 ? "s" : ""} du clan Parjai
+        {members.length} membre{members.length > 1 ? "s" : ""}
       </p>
     </div>
   );

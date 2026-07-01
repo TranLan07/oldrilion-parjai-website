@@ -25,6 +25,8 @@ export default async function ClanLayout({ children, params }: Props) {
       --clan-bg: ${clan.colorBg};
       --clan-primary: ${clan.colorPrimary};
       --clan-accent: ${clan.colorAccent};
+      --accent: ${clan.colorPrimary};
+      --accent-dim: ${clan.colorAccent};
     }
   `;
 

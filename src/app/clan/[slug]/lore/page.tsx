@@ -23,7 +23,7 @@ export default function LorePage() {
 
       {!loading && sections.length === 0 && (
         <p className="py-12 text-center text-foreground/40">
-          Le lore du clan Parjai sera bientôt disponible...
+          Le lore du clan sera bientôt disponible...
         </p>
       )}
 
