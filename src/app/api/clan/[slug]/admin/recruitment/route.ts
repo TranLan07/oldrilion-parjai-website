@@ -61,6 +61,7 @@ export async function PUT(req: NextRequest, { params }: P) {
         specialization: recruitment.specialization,
         permissionLevel: 1,
         mustChangePassword: true,
+        mandalorien: true,
       },
     });
 

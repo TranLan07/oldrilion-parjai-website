@@ -126,11 +126,12 @@ async function main() {
       displayName: "Admin Hub",
       hubRole: "admin",
       role: "admin",
-      clanId: null,       // sans clan (admin hub global)
+      clanId: null,
       grade: "",
       specialization: "",
       permissionLevel: 10,
       mustChangePassword: false,
+      mandalorien: true,
     },
   });
 

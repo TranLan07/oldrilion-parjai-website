@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       hubRole: true, role: true, clanId: true,
       clan: { select: { name: true, slug: true } },
       grade: true, specialization: true, permissionLevel: true,
-      anonymous: true, createdAt: true,
+      anonymous: true, mandalorien: true, createdAt: true,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -24,18 +24,18 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   if (!(await requireHubAdmin())) return hubDenied();
-  const { id, hubRole, banned } = await req.json();
+  const { id, hubRole, banned, mandalorien } = await req.json();
   if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
 
   if (banned) {
-    // Ban = supprimer l'utilisateur
     await prisma.user.delete({ where: { id } });
     return NextResponse.json({ success: true, banned: true });
   }
 
-  const user = await prisma.user.update({
-    where: { id },
-    data: { ...(hubRole && { hubRole }) },
-  });
+  const data: Record<string, unknown> = {};
+  if (hubRole) data.hubRole = hubRole;
+  if (mandalorien !== undefined) data.mandalorien = Boolean(mandalorien);
+
+  const user = await prisma.user.update({ where: { id }, data });
   return NextResponse.json(user);
 }

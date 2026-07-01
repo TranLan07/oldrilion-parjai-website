@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       specialization: "",
       permissionLevel: 10,
       mustChangePassword: true,
+      mandalorien: true,
     },
   });
 

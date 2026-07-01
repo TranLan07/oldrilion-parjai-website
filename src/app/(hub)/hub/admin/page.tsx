@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 type Clan = { id: string; slug: string; name: string; _count: { members: number }; colorPrimary: string };
 type Tag = { id: string; name: string; _count: { clans: number } };
-type User = { id: string; publicId: string; username: string; displayName: string; hubRole: string; clan: { name: string; slug: string } | null; createdAt: string };
+type User = { id: string; publicId: string; username: string; displayName: string; hubRole: string; mandalorien: boolean; clanId: string | null; clan: { name: string; slug: string } | null; createdAt: string };
 type Config = Record<string, string>;
 
 const tabs = ["Clans", "Utilisateurs", "Tags", "Config"] as const;
@@ -88,6 +88,11 @@ export default function HubAdminPage() {
     loadUsers();
   }
 
+  async function toggleMandalorien(id: string, current: boolean) {
+    await fetch("/api/hub/admin/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, mandalorien: !current }) });
+    loadUsers();
+  }
+
   async function saveConfig() {
     await fetch("/api/hub/admin/config", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(configEdit) });
     flash("Configuration sauvegardée.");
@@ -163,7 +168,7 @@ export default function HubAdminPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left" style={{ borderColor: "#1a1a1a" }}>
-                  {["ID", "Nom", "Username", "Clan", "Rôle hub", "Actions"].map(h => (
+                  {["ID", "Nom", "Username", "Clan", "Rôle hub", "Mandalorien", "Actions"].map(h => (
                     <th key={h} className="pb-3 pr-4 text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: "#4a4a4a" }}>{h}</th>
                   ))}
                 </tr>
@@ -179,6 +184,21 @@ export default function HubAdminPage() {
                       <span className="rounded-sm px-1.5 py-0.5 text-xs" style={{ background: u.hubRole === "admin" ? "rgba(255,255,255,0.1)" : "#111", color: u.hubRole === "admin" ? "#f2f2f5" : "#4a4a4a" }}>
                         {u.hubRole}
                       </span>
+                    </td>
+                    <td className="py-2.5 pr-4">
+                      {u.clanId ? (
+                        <span className="text-xs rounded-sm px-1.5 py-0.5" style={{ background: "rgba(201,168,76,0.1)", color: "#c9a84c" }}>Auto</span>
+                      ) : (
+                        <button onClick={() => toggleMandalorien(u.id, u.mandalorien)}
+                          className="text-xs px-2 py-1 rounded-sm border transition-all"
+                          style={{
+                            borderColor: u.mandalorien ? "#c9a84c" : "#2a2a2a",
+                            color: u.mandalorien ? "#c9a84c" : "#4a4a4a",
+                            background: u.mandalorien ? "rgba(201,168,76,0.08)" : "transparent",
+                          }}>
+                          {u.mandalorien ? "Octroye" : "Octroyer"}
+                        </button>
+                      )}
                     </td>
                     <td className="py-2.5">
                       <button onClick={() => { if (confirm(`Bannir ${u.displayName} ?`)) banUser(u.id); }}

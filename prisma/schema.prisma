@@ -94,6 +94,7 @@ model User {
   permissionLevel     Int             @default(1)
   mustChangePassword  Boolean         @default(false)
   anonymous           Boolean         @default(false)
+  mandalorien         Boolean         @default(false)  // tag mandalorien : auto si dans un clan, manuel sinon
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 

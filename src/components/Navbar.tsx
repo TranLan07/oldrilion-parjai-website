@@ -33,6 +33,7 @@ export default function Navbar() {
     { href: "/profil", label: "Profil" },
     { href: "/messagerie", label: "Messages" },
     { href: "/missions", label: "Missions" },
+    { href: "/traducteur", label: "Mando'a" },
     { href: "/notifications", label: "Notifications", badge: unread > 0 ? unread : undefined },
     ...(hubRole === "admin" || hubRole === "moderator" ? [{ href: "/hub/admin", label: "Admin Hub" }] : []),
   ];
