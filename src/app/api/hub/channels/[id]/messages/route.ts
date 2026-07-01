@@ -13,6 +13,15 @@ export async function GET(_req: NextRequest, { params }: P) {
   const channel = await prisma.channel.findUnique({ where: { id, clanId: null } });
   if (!channel) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
 
+  // Vérification d'accès aux canaux privés
+  if (channel.isPrivate) {
+    const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { clanId: true } });
+    const accessClans: string[] = JSON.parse(channel.accessClans || "[]");
+    if (!userRecord?.clanId || !accessClans.includes(userRecord.clanId)) {
+      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    }
+  }
+
   // Auto-join si pas encore membre
   const existing = await prisma.channelMember.findUnique({
     where: { userId_channelId: { userId: session.user.id, channelId: id } },
@@ -38,6 +47,14 @@ export async function POST(req: NextRequest, { params }: P) {
   const { id } = await params;
   const channel = await prisma.channel.findUnique({ where: { id, clanId: null } });
   if (!channel) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
+
+  if (channel.isPrivate) {
+    const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { clanId: true } });
+    const accessClans: string[] = JSON.parse(channel.accessClans || "[]");
+    if (!userRecord?.clanId || !accessClans.includes(userRecord.clanId)) {
+      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    }
+  }
 
   const membership = await prisma.channelMember.findUnique({
     where: { userId_channelId: { userId: session.user.id, channelId: id } },

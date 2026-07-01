@@ -23,6 +23,11 @@ export async function PUT(req: NextRequest, { params }: P) {
   const { id, gradeId, specializationId, grade, specialization, role, permissionLevel, displayName } = await req.json();
   if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
 
+  const clan = await resolveClan(slug);
+  if (!clan) return notFound();
+  const target = await prisma.user.findUnique({ where: { id }, select: { clanId: true } });
+  if (!target || target.clanId !== clan.id) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
+
   const user = await prisma.user.update({ where: { id }, data: {
     ...(displayName && { displayName }),
     ...(role && { role }),
@@ -40,6 +45,10 @@ export async function DELETE(req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const { id } = await req.json();
   if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
+  const clan2 = await resolveClan(slug);
+  if (!clan2) return notFound();
+  const target2 = await prisma.user.findUnique({ where: { id }, select: { clanId: true } });
+  if (!target2 || target2.clanId !== clan2.id) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
   await prisma.user.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

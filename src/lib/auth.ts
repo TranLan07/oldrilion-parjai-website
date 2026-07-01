@@ -29,10 +29,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user?.id) {
-        token.userId = user.id;
+      const uid = user?.id ?? (token.userId as string | undefined) ?? token.sub;
+      if (uid) {
+        token.userId = uid;
         const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id: uid },
           include: { clan: { select: { slug: true, name: true } } },
         });
         if (dbUser) {
@@ -47,9 +48,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.mustChangePassword = dbUser.mustChangePassword;
           token.anonymous = dbUser.anonymous;
         }
-      }
-      if (!token.userId && token.sub) {
-        token.userId = token.sub;
       }
       return token;
     },

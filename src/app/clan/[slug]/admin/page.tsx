@@ -43,10 +43,10 @@ export default function AdminPage() {
   const [specs, setSpecs] = useState<Spec[]>([]);
 
   const apiMap: Record<Tab, string> = {
-    users: "/api/clan/${slug}/admin/users", recruitment: "/api/clan/${slug}/admin/recruitment", channels: "/api/clan/${slug}/admin/channels",
-    missions: "/api/clan/${slug}/admin/missions", evenements: "/api/clan/${slug}/admin/evenements", pages: "/api/clan/${slug}/admin/pages",
-    lore: "/api/clan/${slug}/admin/lore", rules: "/api/clan/${slug}/admin/rules", grades: "/api/clan/${slug}/admin/grades", specs: "/api/clan/${slug}/admin/specializations", tags: "/api/clan/${slug}/admin/tags",
-    whitelist: "/api/clan/${slug}/admin/whitelist", theme: "/api/clan/${slug}/admin/settings", settings: "/api/clan/${slug}/admin/settings",
+    users: `/api/clan/${slug}/admin/users`, recruitment: `/api/clan/${slug}/admin/recruitment`, channels: `/api/clan/${slug}/admin/channels`,
+    missions: `/api/clan/${slug}/admin/missions`, evenements: `/api/clan/${slug}/admin/evenements`, pages: `/api/clan/${slug}/admin/pages`,
+    lore: `/api/clan/${slug}/admin/lore`, rules: `/api/clan/${slug}/admin/rules`, grades: `/api/clan/${slug}/admin/grades`, specs: `/api/clan/${slug}/admin/specializations`, tags: `/api/clan/${slug}/admin/tags`,
+    whitelist: `/api/clan/${slug}/admin/whitelist`, theme: `/api/clan/${slug}/admin/settings`, settings: `/api/clan/${slug}/admin/settings`,
   };
 
   const load = useCallback(async () => {
@@ -65,9 +65,9 @@ export default function AdminPage() {
     m[tab]?.(data);
     if (tab === "users" || tab === "channels") {
       const [gr, sp, us] = await Promise.all([
-        fetch("/api/clan/${slug}/admin/grades"),
-        fetch("/api/clan/${slug}/admin/specializations"),
-        tab === "channels" ? fetch("/api/clan/${slug}/admin/users") : Promise.resolve(null),
+        fetch(`/api/clan/${slug}/admin/grades`),
+        fetch(`/api/clan/${slug}/admin/specializations`),
+        tab === "channels" ? fetch(`/api/clan/${slug}/admin/users`) : Promise.resolve(null),
       ]);
       if (gr.ok) setGrades(await gr.json());
       if (sp.ok) setSpecs(await sp.json());
@@ -83,7 +83,8 @@ export default function AdminPage() {
   }
 
   async function api(endpoint: string, method: string, body?: object) {
-    await fetch(endpoint, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+    const url = endpoint.replace("${slug}", slug);
+    await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
     load();
   }
 
@@ -108,16 +109,16 @@ export default function AdminPage() {
       </div>
 
       {tab === "users" && <UsersTab users={users} grades={grades} specs={specs} api={api} load={load} />}
-      {tab === "recruitment" && <RecruitmentTab recruitments={recruitments} load={load} />}
+      {tab === "recruitment" && <RecruitmentTab recruitments={recruitments} slug={slug} load={load} />}
       {tab === "grades" && <GradesTab grades={grades} api={api} />}
-      {tab === "channels" && <ChannelsTab channels={channels} users={users} grades={grades} specs={specs} api={api} load={load} />}
+      {tab === "channels" && <ChannelsTab channels={channels} users={users} grades={grades} specs={specs} slug={slug} api={api} load={load} />}
       {tab === "missions" && <MissionsTab missions={missions} api={api} />}
       {tab === "evenements" && <EvenementsTab slug={slug} />}
       {tab === "whitelist" && <WhitelistTab slug={slug} />}
       {tab === "theme" && <ThemeTab slug={slug} />}
       {tab === "settings" && <SettingsTab slug={slug} />}
-      {tab === "lore" && <ContentTab sections={loreSections} endpoint="/api/clan/${slug}/admin/lore" label="Lore" api={api} />}
-      {tab === "rules" && <ContentTab sections={ruleSections} endpoint="/api/clan/${slug}/admin/rules" label="Règle" api={api} />}
+      {tab === "lore" && <ContentTab sections={loreSections} endpoint={`/api/clan/${slug}/admin/lore`} label="Lore" api={api} />}
+      {tab === "rules" && <ContentTab sections={ruleSections} endpoint={`/api/clan/${slug}/admin/rules`} label="Règle" api={api} />}
       {tab === "specs" && <SpecsTab specs={specs} api={api} />}
       {tab === "pages" && <PagesTab pages={pages} api={api} />}
       {tab === "tags" && <TagsTab slug={slug} />}
@@ -201,9 +202,9 @@ function UsersTab({ users, grades, specs, api, load }: { users: User[]; grades: 
 }
 
 // ── Recruitment ──
-function RecruitmentTab({ recruitments, load }: { recruitments: Recruitment[]; load: () => void }) {
+function RecruitmentTab({ recruitments, slug, load }: { recruitments: Recruitment[]; slug: string; load: () => void }) {
   async function handle(id: string, action: "approve" | "reject") {
-    const res = await fetch("/api/clan/${slug}/admin/recruitment", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) });
+    const res = await fetch(`/api/clan/${slug}/admin/recruitment`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) });
     const data = await res.json();
     if (action === "approve" && data.tempPassword) {
       // Will show in the UI via tempPassword field
@@ -317,8 +318,8 @@ function GradesTab({ grades, api }: { grades: Grade[]; api: (e: string, m: strin
 }
 
 // ── Channels ──
-function ChannelsTab({ channels, users, grades, specs, api, load }: {
-  channels: Channel[]; users: User[]; grades: Grade[]; specs: Spec[];
+function ChannelsTab({ channels, users, grades, specs, slug, api, load }: {
+  channels: Channel[]; users: User[]; grades: Grade[]; specs: Spec[]; slug: string;
   api: (e: string, m: string, b?: object) => Promise<void>; load: () => void;
 }) {
   const [showForm, setShowForm] = useState(false);
@@ -349,13 +350,13 @@ function ChannelsTab({ channels, users, grades, specs, api, load }: {
 
   async function addMember(channelId: string) {
     if (!addUserId) return;
-    await fetch("/api/clan/${slug}/admin/channels", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: channelId, action: "addMember", userId: addUserId }) });
+    await fetch(`/api/clan/${slug}/admin/channels`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: channelId, action: "addMember", userId: addUserId }) });
     setAddUserId("");
     load();
   }
 
   async function removeMember(channelId: string, userId: string) {
-    await fetch("/api/clan/${slug}/admin/channels", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: channelId, action: "removeMember", userId }) });
+    await fetch(`/api/clan/${slug}/admin/channels`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: channelId, action: "removeMember", userId }) });
     load();
   }
 
