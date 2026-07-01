@@ -12,7 +12,7 @@ type Channel = {
 };
 type Message = {
   id: string; content: string; createdAt: string;
-  user: { id: string; displayName: string; role: string; grade: string };
+  user: { id: string; displayName: string; role: string; grade: string; anonymous: boolean; publicId: string };
 };
 type UserOption = { id: string; displayName: string };
 
@@ -39,8 +39,8 @@ export default function MessageriePage() {
   const [allUsers, setAllUsers] = useState<UserOption[]>([]);
   const [addUserId, setAddUserId] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const firstLoad = useRef(true);
+  const sseRef = useRef<EventSource | null>(null);
 
   const loadChannels = useCallback(async () => {
     const res = await fetch(`/api/clan/${slug}/channels`);
@@ -62,11 +62,37 @@ export default function MessageriePage() {
   useEffect(() => { if (session) loadChannels(); }, [session, loadChannels]);
 
   useEffect(() => {
-    if (!activeId) return;
+    if (!activeId || !session) return;
+
+    // Charge l'historique initial
     loadMessages();
-    pollRef.current = setInterval(loadMessages, 3000);
-    return () => clearInterval(pollRef.current);
-  }, [activeId, loadMessages]);
+
+    // Ouvre la connexion SSE pour les nouveaux messages
+    const es = new EventSource(`/api/clan/${slug}/channels/${activeId}/sse`);
+    sseRef.current = es;
+
+    es.onmessage = (e) => {
+      try {
+        const payload = JSON.parse(e.data);
+        if (payload.type === "message") {
+          setMessages(prev => {
+            if (prev.some(m => m.id === payload.message.id)) return prev;
+            return [...prev, payload.message];
+          });
+        }
+      } catch { /* ignore */ }
+    };
+
+    es.onerror = () => {
+      // En cas d'erreur, on ferme et on retente dans 5s
+      es.close();
+      const t = setTimeout(() => setActiveId(id => id), 5000);
+      return () => clearTimeout(t);
+    };
+
+    return () => { es.close(); sseRef.current = null; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, session]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -92,7 +118,7 @@ export default function MessageriePage() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: newMsg }),
     });
-    if (res.ok) { setNewMsg(""); loadMessages(); }
+    if (res.ok) { setNewMsg(""); }
     setSending(false);
   }
 
@@ -271,24 +297,27 @@ export default function MessageriePage() {
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {messages.length === 0 && activeId && <p className="py-8 text-center text-sm" style={{ color: "var(--beskar-500)" }}>Aucun message. Soyez le premier à écrire !</p>}
-          {messages.map((msg) => (
-            <div key={msg.id} className="mb-3 flex gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                style={{ background: "var(--grad-blood)", color: "var(--beskar-100)", fontFamily: "var(--font-display)" }}>
-                {msg.user.displayName.charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-sm font-semibold" style={{ color: "var(--beskar-100)" }}>{msg.user.displayName}</span>
-                  <span className="text-xs" style={{ color: "var(--beskar-500)" }}>{msg.user.grade}</span>
-                  <span className="text-xs" style={{ color: "var(--beskar-600)" }}>
-                    {new Date(msg.createdAt).toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
-                  </span>
+          {messages.map((msg) => {
+            const displayName = msg.user.anonymous ? `Anonyme [${msg.user.publicId}]` : msg.user.displayName;
+            return (
+              <div key={msg.id} className="mb-3 flex gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                  style={{ background: msg.user.anonymous ? "rgba(107,114,128,0.2)" : "var(--grad-blood)", color: "var(--beskar-100)", fontFamily: "var(--font-display)" }}>
+                  {displayName.charAt(0).toUpperCase()}
                 </div>
-                <p className="text-sm break-words" style={{ color: "var(--beskar-200)" }}>{msg.content}</p>
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-semibold" style={{ color: msg.user.anonymous ? "var(--beskar-400)" : "var(--beskar-100)" }}>{displayName}</span>
+                    {!msg.user.anonymous && <span className="text-xs" style={{ color: "var(--beskar-500)" }}>{msg.user.grade}</span>}
+                    <span className="text-xs" style={{ color: "var(--beskar-600)" }}>
+                      {new Date(msg.createdAt).toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
+                    </span>
+                  </div>
+                  <p className="text-sm break-words" style={{ color: "var(--beskar-200)" }}>{msg.content}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
 

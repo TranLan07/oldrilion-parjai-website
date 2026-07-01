@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notifyChannelFollowers } from "@/lib/notify-followers";
+import { publish } from "@/lib/sse-store";
 
 type P = { params: Promise<{ slug: string; id: string }> };
 
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest, { params }: P) {
     });
 
     notifyChannelFollowers(id, message.user.displayName, content.trim()).catch(console.error);
+    publish(id, { type: "message", message });
     return NextResponse.json(message);
   } catch (e) {
     console.error("POST message error:", e);
