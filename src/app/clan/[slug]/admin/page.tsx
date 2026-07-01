@@ -16,7 +16,7 @@ type Grade = { id: string; name: string; defaultPermission: number; order: numbe
 type DictEntry = { id: string; french: string; mandoa: string };
 type Spec = { id: string; name: string; description: string; defaultPermission: number; secret: boolean; order: number; _count: { users: number } };
 
-type Tab = "users" | "recruitment" | "channels" | "missions" | "pages" | "lore" | "rules" | "grades" | "specs" | "dictionary";
+type Tab = "users" | "recruitment" | "channels" | "missions" | "pages" | "lore" | "rules" | "grades" | "specs" | "dictionary" | "tags";
 
 const inp = "w-full rounded border border-accent-dim/30 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent";
 const btnDanger = "rounded bg-red-900/30 px-3 py-1.5 text-sm text-red-400 hover:bg-red-900/50";
@@ -47,7 +47,7 @@ export default function AdminPage() {
   const apiMap: Record<Tab, string> = {
     users: "/api/clan/${slug}/admin/users", recruitment: "/api/clan/${slug}/admin/recruitment", channels: "/api/clan/${slug}/admin/channels",
     missions: "/api/clan/${slug}/admin/missions", pages: "/api/clan/${slug}/admin/pages",
-    lore: "/api/clan/${slug}/admin/lore", rules: "/api/clan/${slug}/admin/rules", grades: "/api/clan/${slug}/admin/grades", specs: "/api/clan/${slug}/admin/specializations", dictionary: "/api/clan/${slug}/admin/dictionary",
+    lore: "/api/clan/${slug}/admin/lore", rules: "/api/clan/${slug}/admin/rules", grades: "/api/clan/${slug}/admin/grades", specs: "/api/clan/${slug}/admin/specializations", dictionary: "/api/clan/${slug}/admin/dictionary", tags: "/api/clan/${slug}/admin/tags",
   };
 
   const load = useCallback(async () => {
@@ -61,6 +61,7 @@ export default function AdminPage() {
       rules: (d) => setRuleSections(d as ContentSection[]), grades: (d) => setGrades(d as Grade[]),
       dictionary: (d) => setDictEntries(d as DictEntry[]),
       specs: (d) => setSpecs(d as Spec[]),
+      tags: () => {},
     };
     m[tab]?.(data);
     if (tab === "users" || tab === "channels") {
@@ -92,7 +93,7 @@ export default function AdminPage() {
     { key: "grades", label: "Grades" }, { key: "channels", label: "Canaux" },
     { key: "missions", label: "Missions" }, { key: "lore", label: "Lore" },
     { key: "rules", label: "Règles" }, { key: "specs", label: "Spécialisations" },
-    { key: "dictionary", label: "Dictionnaire" }, { key: "pages", label: "Permissions" },
+    { key: "dictionary", label: "Dictionnaire" }, { key: "pages", label: "Permissions" }, { key: "tags", label: "Tags" },
   ];
 
   return (
@@ -116,6 +117,7 @@ export default function AdminPage() {
       {tab === "specs" && <SpecsTab specs={specs} api={api} />}
       {tab === "dictionary" && <DictionaryTab entries={dictEntries} load={load} />}
       {tab === "pages" && <PagesTab pages={pages} api={api} />}
+      {tab === "tags" && <TagsTab slug={slug} />}
     </div>
   );
 }
@@ -972,6 +974,74 @@ function SpecsTab({ specs, api }: { specs: Spec[]; api: (e: string, m: string, b
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function TagsTab({ slug }: { slug: string }) {
+  const [allTags, setAllTags] = useState<{ id: string; name: string }[]>([]);
+  const [clanTags, setClanTags] = useState<{ id: string; name: string }[]>([]);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    fetch("/api/tags").then(r => r.json()).then(setAllTags).catch(() => {});
+    fetch(`/api/clan/${slug}/admin/tags`).then(r => r.json()).then(setClanTags).catch(() => {});
+  }, [slug]);
+
+  const clanTagIds = new Set(clanTags.map(t => t.id));
+
+  async function addTag(tagId: string) {
+    const r = await fetch(`/api/clan/${slug}/admin/tags`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagId }),
+    });
+    const d = await r.json();
+    if (!r.ok) { setMsg(d.error); return; }
+    setMsg("");
+    fetch(`/api/clan/${slug}/admin/tags`).then(r => r.json()).then(setClanTags);
+  }
+
+  async function removeTag(tagId: string) {
+    await fetch(`/api/clan/${slug}/admin/tags`, {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tagId }),
+    });
+    fetch(`/api/clan/${slug}/admin/tags`).then(r => r.json()).then(setClanTags);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em]" style={{ fontFamily: "var(--font-display)", color: "var(--gold-500)" }}>Tags du clan</h3>
+        {clanTags.length === 0 ? (
+          <p className="text-sm" style={{ color: "var(--beskar-400)" }}>Aucun tag assigné.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {clanTags.map(tag => (
+              <div key={tag.id} className="flex items-center gap-2 rounded-sm border px-3 py-1.5"
+                style={{ borderColor: "var(--beskar-600)", background: "var(--beskar-800)" }}>
+                <span className="text-sm" style={{ color: "var(--beskar-100)" }}>{tag.name}</span>
+                <button onClick={() => removeTag(tag.id)} className="text-xs" style={{ color: "var(--beskar-400)" }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {msg && <p className="text-sm" style={{ color: "var(--red-600)" }}>{msg}</p>}
+      <div>
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em]" style={{ fontFamily: "var(--font-display)", color: "var(--beskar-300)" }}>Tags disponibles</h3>
+        <div className="flex flex-wrap gap-2">
+          {allTags.filter(t => !clanTagIds.has(t.id)).map(tag => (
+            <button key={tag.id} onClick={() => addTag(tag.id)}
+              className="rounded-sm border px-3 py-1.5 text-sm transition-colors"
+              style={{ borderColor: "var(--beskar-600)", color: "var(--beskar-300)", background: "transparent" }}
+            >+ {tag.name}</button>
+          ))}
+          {allTags.filter(t => !clanTagIds.has(t.id)).length === 0 && (
+            <p className="text-sm" style={{ color: "var(--beskar-500)" }}>Tous les tags sont déjà assignés, ou aucun tag n'existe (créez-en depuis l'Admin Hub).</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
