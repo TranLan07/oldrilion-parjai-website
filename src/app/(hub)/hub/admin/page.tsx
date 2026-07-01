@@ -315,19 +315,59 @@ export default function HubAdminPage() {
       )}
 
       {/* ── Config ── */}
-      {tab === "Config" && (
-        <div className="space-y-4 max-w-sm">
-          {Object.entries(configEdit).map(([key, value]) => (
-            <div key={key}>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: "#4a4a4a" }}>{key}</label>
-              <input value={value} onChange={e => setConfigEdit(prev => ({ ...prev, [key]: e.target.value }))}
-                className="w-full rounded-sm border px-3 py-2 text-sm outline-none" style={inputStyle} />
-            </div>
-          ))}
-          <button onClick={saveConfig} className="rounded-sm px-4 py-2 text-sm font-semibold"
-            style={{ background: "#f2f2f5", color: "#000" }}>Sauvegarder</button>
-        </div>
-      )}
+      {tab === "Config" && (() => {
+        const configFields = [
+          {
+            key: "maxTagsPerClan",
+            label: "Tags max par clan",
+            desc: "Nombre maximum de tags qu'un clan peut avoir. Les admins de clan ne peuvent pas dépasser cette limite.",
+            type: "number",
+            min: 1, max: 20,
+          },
+          {
+            key: "hubAnonRevealLevel",
+            label: "Niveau de permission pour révéler les anonymes (hub)",
+            desc: "Permission minimale requise pour voir la vraie identité d'un membre en mode anonyme, dans les espaces hub. (1–10)",
+            type: "number",
+            min: 1, max: 10,
+          },
+          {
+            key: "contactEmail",
+            label: "Email de notification — Contacts",
+            desc: "Adresse email qui reçoit une alerte à chaque nouvelle demande de contact/RGPD soumise via le formulaire public.",
+            type: "email",
+          },
+        ];
+
+        return (
+          <div className="space-y-5 max-w-lg">
+            {configFields.map(field => (
+              <div key={field.key} className="rounded-sm border p-5 space-y-3" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
+                <div>
+                  <label className="block text-sm font-semibold" style={{ color: "#f2f2f5" }}>{field.label}</label>
+                  <p className="mt-1 text-xs leading-relaxed" style={{ color: "#6b7280" }}>{field.desc}</p>
+                </div>
+                <input
+                  type={field.type}
+                  value={configEdit[field.key] ?? ""}
+                  onChange={e => setConfigEdit(prev => ({ ...prev, [field.key]: e.target.value }))}
+                  className="w-full rounded-sm border px-3 py-2 text-sm outline-none"
+                  style={inputStyle}
+                  {...(field.min !== undefined ? { min: field.min } : {})}
+                  {...(field.max !== undefined ? { max: field.max } : {})}
+                  placeholder={field.type === "email" ? "admin@exemple.com" : ""}
+                />
+              </div>
+            ))}
+            <button onClick={saveConfig} className="rounded-sm px-5 py-2.5 text-sm font-semibold transition-all"
+              style={{ background: "#f2f2f5", color: "#000" }}
+              onMouseEnter={e => { e.currentTarget.style.background = "#e5e7eb"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "#f2f2f5"; }}>
+              Sauvegarder
+            </button>
+          </div>
+        );
+      })()}
 
       {/* ── Messagerie inter-clans ── */}
       {tab === "Messagerie" && (
