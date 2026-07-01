@@ -4,12 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build --webpack",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
-    "@ducanh2912/next-pwa": "^10.2.9",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "french-verbs": "^5.4.0",

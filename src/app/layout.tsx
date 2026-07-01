@@ -3,6 +3,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Providers from "@/components/Providers";
 import "./globals.css";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Le Hub — Hub Mandalorien",
@@ -35,6 +36,11 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
+        <Script id="sw-register" strategy="afterInteractive">{`
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+          }
+        `}</Script>
       </body>
     </html>
   );
