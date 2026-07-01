@@ -8,7 +8,7 @@ type Tag = { id: string; name: string; _count: { clans: number } };
 type User = { id: string; publicId: string; username: string; displayName: string; hubRole: string; mandalorien: boolean; clanId: string | null; clan: { name: string; slug: string } | null; createdAt: string };
 type Config = Record<string, string>;
 
-const tabs = ["Clans", "Utilisateurs", "Tags", "Config", "Contacts"] as const;
+const tabs = ["Clans", "Utilisateurs", "Tags", "Config", "Contacts", "Messagerie", "Missions"] as const;
 type Tab = typeof tabs[number];
 
 export default function HubAdminPage() {
@@ -16,6 +16,8 @@ export default function HubAdminPage() {
   const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string;
 
   type ContactMsg = { id: string; name: string; email: string; type: string; subject: string; message: string; read: boolean; createdAt: string };
+  type HubChannel = { id: string; name: string; description: string; _count: { messages: number }; members: { user: { id: string; displayName: string } }[] };
+  type HubMission = { id: string; title: string; description: string; status: string; maxParticipants: number; createdAt: string; clan: { name: string; slug: string; colorPrimary: string } | null };
 
   const [tab, setTab] = useState<Tab>("Clans");
   const [clans, setClans] = useState<Clan[]>([]);
@@ -31,6 +33,11 @@ export default function HubAdminPage() {
   const [contactEmail, setContactEmail] = useState("");
   const [contactFilter, setContactFilter] = useState<"all" | "unread">("unread");
   const [openContact, setOpenContact] = useState<string | null>(null);
+  const [hubChannels, setHubChannels] = useState<HubChannel[]>([]);
+  const [newChannelName, setNewChannelName] = useState("");
+  const [newChannelDesc, setNewChannelDesc] = useState("");
+  const [hubMissions, setHubMissions] = useState<HubMission[]>([]);
+  const [missionForm, setMissionForm] = useState({ title: "", description: "", maxParticipants: "0" });
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(""), 3000); }
 
@@ -39,7 +46,16 @@ export default function HubAdminPage() {
     if (r.ok) setContacts(await r.json());
   }
 
-  useEffect(() => { loadClans(); loadTags(); loadUsers(); loadConfig(); loadContacts(); }, []);
+  async function loadHubChannels() {
+    const r = await fetch("/api/hub/channels");
+    if (r.ok) setHubChannels(await r.json());
+  }
+  async function loadHubMissions() {
+    const r = await fetch("/api/hub/admin/missions");
+    if (r.ok) setHubMissions(await r.json());
+  }
+
+  useEffect(() => { loadClans(); loadTags(); loadUsers(); loadConfig(); loadContacts(); loadHubChannels(); loadHubMissions(); }, []);
 
   async function loadClans() {
     const r = await fetch("/api/hub/admin/clans");
@@ -282,6 +298,139 @@ export default function HubAdminPage() {
           ))}
           <button onClick={saveConfig} className="rounded-sm px-4 py-2 text-sm font-semibold"
             style={{ background: "#f2f2f5", color: "#000" }}>Sauvegarder</button>
+        </div>
+      )}
+
+      {/* ── Messagerie inter-clans ── */}
+      {tab === "Messagerie" && (
+        <div className="space-y-6">
+          <p className="text-sm" style={{ color: "#6b7280" }}>
+            Gérez les canaux de messagerie inter-clans accessibles à tous les membres du Hub (y compris sans-clans).
+          </p>
+          {/* Créer un canal */}
+          <div className="rounded-sm border p-4 space-y-3" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "#4a4a4a" }}>Nouveau canal</h3>
+            <div className="flex flex-wrap gap-2">
+              <input value={newChannelName} onChange={e => setNewChannelName(e.target.value)}
+                className="rounded-sm border px-3 py-2 text-sm outline-none w-48" style={inputStyle}
+                placeholder="Nom du canal" />
+              <input value={newChannelDesc} onChange={e => setNewChannelDesc(e.target.value)}
+                className="rounded-sm border px-3 py-2 text-sm outline-none w-64" style={inputStyle}
+                placeholder="Description (optionnel)" />
+              <button onClick={async () => {
+                if (!newChannelName.trim()) return;
+                await fetch("/api/hub/channels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newChannelName.trim(), description: newChannelDesc.trim() }) });
+                setNewChannelName(""); setNewChannelDesc(""); loadHubChannels(); flash("Canal créé.");
+              }} className="rounded-sm px-4 py-2 text-sm font-semibold" style={{ background: "#f2f2f5", color: "#000" }}>
+                Créer
+              </button>
+            </div>
+          </div>
+          {/* Liste des canaux */}
+          <div className="space-y-2">
+            {hubChannels.length === 0 && <p className="text-sm" style={{ color: "#3a3a3a" }}>Aucun canal hub.</p>}
+            {hubChannels.map(ch => (
+              <div key={ch.id} className="flex items-center justify-between rounded-sm border px-4 py-3"
+                style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
+                <div>
+                  <span className="font-semibold text-sm" style={{ color: "#f2f2f5" }}># {ch.name}</span>
+                  {ch.description && <span className="ml-2 text-xs" style={{ color: "#4a4a4a" }}>{ch.description}</span>}
+                  <span className="ml-3 text-xs" style={{ color: "#3a3a3a" }}>{ch._count.messages} msg · {ch.members.length} membres</span>
+                </div>
+                <button onClick={async () => {
+                  if (!confirm(`Supprimer #${ch.name} et tous ses messages ?`)) return;
+                  await fetch("/api/hub/channels", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: ch.id }) });
+                  loadHubChannels(); flash("Canal supprimé.");
+                }} className="text-xs px-3 py-1.5 rounded-sm" style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>
+                  Supprimer
+                </button>
+              </div>
+            ))}
+          </div>
+          <a href="/messagerie" className="inline-block text-sm" style={{ color: "#c9a84c" }}>Ouvrir la messagerie hub →</a>
+        </div>
+      )}
+
+      {/* ── Missions hub ── */}
+      {tab === "Missions" && (
+        <div className="space-y-6">
+          <p className="text-sm" style={{ color: "#6b7280" }}>
+            Missions globales du hub + missions de clans marquées "global". Vous pouvez retirer une mission de clan du hub ou supprimer les missions hub.
+          </p>
+          {/* Créer une mission hub */}
+          <div className="rounded-sm border p-4 space-y-3" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
+            <h3 className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "#4a4a4a" }}>Nouvelle mission hub</h3>
+            <div className="flex flex-wrap gap-2">
+              <input value={missionForm.title} onChange={e => setMissionForm(f => ({ ...f, title: e.target.value }))}
+                className="rounded-sm border px-3 py-2 text-sm outline-none w-56" style={inputStyle} placeholder="Titre" />
+              <input value={missionForm.description} onChange={e => setMissionForm(f => ({ ...f, description: e.target.value }))}
+                className="rounded-sm border px-3 py-2 text-sm outline-none w-72" style={inputStyle} placeholder="Description" />
+              <input type="number" value={missionForm.maxParticipants} onChange={e => setMissionForm(f => ({ ...f, maxParticipants: e.target.value }))}
+                className="rounded-sm border px-3 py-2 text-sm outline-none w-28" style={inputStyle} placeholder="Max participants (0=∞)" min="0" />
+              <button onClick={async () => {
+                if (!missionForm.title.trim()) return;
+                await fetch("/api/hub/admin/missions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(missionForm) });
+                setMissionForm({ title: "", description: "", maxParticipants: "0" }); loadHubMissions(); flash("Mission créée.");
+              }} className="rounded-sm px-4 py-2 text-sm font-semibold" style={{ background: "#f2f2f5", color: "#000" }}>
+                Créer
+              </button>
+            </div>
+          </div>
+          {/* Liste missions */}
+          <div className="space-y-2">
+            {hubMissions.length === 0 && <p className="text-sm" style={{ color: "#3a3a3a" }}>Aucune mission globale.</p>}
+            {hubMissions.map(m => (
+              <div key={m.id} className="rounded-sm border p-4" style={{ borderColor: m.clan ? `${m.clan.colorPrimary}30` : "#1e1e1e", background: "#0d0d0d" }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="font-bold text-sm uppercase tracking-[0.08em]" style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>{m.title}</span>
+                      {m.clan ? (
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded-sm" style={{ color: m.clan.colorPrimary, border: `1px solid ${m.clan.colorPrimary}40` }}>{m.clan.name}</span>
+                      ) : (
+                        <span className="text-xs px-1.5 py-0.5 rounded-sm" style={{ color: "#6b7280", border: "1px solid #2a2a2a" }}>Hub</span>
+                      )}
+                      <span className="text-xs" style={{ color: "#4a4a4a" }}>{m.status}</span>
+                    </div>
+                    {m.description && <p className="text-xs" style={{ color: "#6b7280" }}>{m.description}</p>}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    {m.clan ? (
+                      <button onClick={async () => {
+                        await fetch("/api/hub/admin/missions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.id }) });
+                        loadHubMissions(); flash("Mission retirée du hub.");
+                      }} className="text-xs px-3 py-1.5 rounded-sm border" style={{ borderColor: "#2a2a2a", color: "#9ca3af" }}>
+                        Retirer du Hub
+                      </button>
+                    ) : (
+                      <>
+                        <select onChange={async (e) => {
+                          if (!e.target.value) return;
+                          await fetch("/api/hub/admin/missions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.id, status: e.target.value }) });
+                          loadHubMissions(); flash("Statut mis à jour.");
+                          e.target.value = "";
+                        }} className="text-xs rounded-sm border px-2 py-1.5 outline-none" style={{ background: "#111", borderColor: "#2a2a2a", color: "#9ca3af" }}>
+                          <option value="">Statut...</option>
+                          <option value="en_cours">En cours</option>
+                          <option value="validee">Validée</option>
+                          <option value="abandonnee">Abandonnée</option>
+                          <option value="ratee">Ratée</option>
+                        </select>
+                        <button onClick={async () => {
+                          if (!confirm(`Supprimer la mission "${m.title}" ?`)) return;
+                          await fetch("/api/hub/admin/missions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.id }) });
+                          loadHubMissions(); flash("Mission supprimée.");
+                        }} className="text-xs px-3 py-1.5 rounded-sm" style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>
+                          Supprimer
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <a href="/missions" className="inline-block text-sm" style={{ color: "#c9a84c" }}>Voir les missions hub →</a>
         </div>
       )}
 

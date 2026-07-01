@@ -22,13 +22,14 @@ export async function POST(req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
-  const { title, description, confidentiality, maxParticipants, memberIds } = await req.json();
+  const { title, description, confidentiality, maxParticipants, memberIds, visibility } = await req.json();
   if (!title) return NextResponse.json({ error: "Titre requis" }, { status: 400 });
   const mission = await prisma.mission.create({
     data: {
       clanId: clan.id, title, description: description || "",
       confidentiality: confidentiality || "standard",
       maxParticipants: maxParticipants || 0,
+      visibility: visibility === "global" ? "global" : "internal",
       members: memberIds?.length ? { create: memberIds.map((userId: string) => ({ userId })) } : undefined,
     },
   });
@@ -56,6 +57,7 @@ export async function PUT(req: NextRequest, { params }: P) {
     ...(data.status && { status: data.status }),
     ...(data.confidentiality && { confidentiality: data.confidentiality }),
     ...(data.maxParticipants !== undefined && { maxParticipants: data.maxParticipants }),
+    ...(data.visibility !== undefined && { visibility: data.visibility }),
   }});
   return NextResponse.json(mission);
 }

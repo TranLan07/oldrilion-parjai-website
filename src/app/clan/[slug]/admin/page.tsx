@@ -9,7 +9,7 @@ type User = { id: string; username: string; displayName: string; role: string; g
 type Recruitment = { id: string; rpName: string; discord: string; experience: string; motivation: string; specialization: string; status: string; tempPassword?: string };
 type ChannelMemberAdmin = { muted: boolean; user: { id: string; displayName: true; grade: string; specialization: string } };
 type Channel = { id: string; name: string; description: string; isPrivate: boolean; members: ChannelMemberAdmin[]; _count: { messages: number } };
-type Mission = { id: string; title: string; description: string; status: string; confidentiality: string; maxParticipants: number; members: { user: { id: string; displayName: string } }[] };
+type Mission = { id: string; title: string; description: string; status: string; confidentiality: string; maxParticipants: number; visibility: string; members: { user: { id: string; displayName: string } }[] };
 type PagePerm = { id: string; path: string; label: string; minPermission: number };
 type ContentSection = { id: string; order: number; title: string; description: string };
 type Grade = { id: string; name: string; defaultPermission: number; order: number; _count: { users: number } };
@@ -514,13 +514,13 @@ function ChannelsTab({ channels, users, grades, specs, api, load }: {
 // ── Missions ──
 function MissionsTab({ missions, api }: { missions: Mission[]; api: (e: string, m: string, b?: object) => Promise<void> }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", confidentiality: "standard", maxParticipants: 0 });
+  const [form, setForm] = useState({ title: "", description: "", confidentiality: "standard", maxParticipants: 0, visibility: "internal" });
   const [deleting, setDeleting] = useState<string | null>(null);
 
   async function create() {
     if (!form.title) return;
     await api("/api/clan/${slug}/admin/missions", "POST", form);
-    setForm({ title: "", description: "", confidentiality: "standard", maxParticipants: 0 });
+    setForm({ title: "", description: "", confidentiality: "standard", maxParticipants: 0, visibility: "internal" });
     setShowForm(false);
   }
 
@@ -545,6 +545,10 @@ function MissionsTab({ missions, api }: { missions: Mission[]; api: (e: string, 
           <div><label className="mb-1 block text-xs text-foreground/50">Description</label>
             <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className={`resize-none ${inp}`} placeholder="Détails de la mission..." />
           </div>
+          <label className="flex items-center gap-2 text-sm text-foreground/60 cursor-pointer">
+            <input type="checkbox" checked={form.visibility === "global"} onChange={e => setForm({ ...form, visibility: e.target.checked ? "global" : "internal" })} />
+            Publier sur le Hub inter-clans
+          </label>
           <div className="flex gap-2">
             <button onClick={create} className={btnGreen}>Créer</button>
             <button onClick={() => setShowForm(false)} className={btnSecondary}>Annuler</button>
@@ -571,7 +575,11 @@ function MissionsTab({ missions, api }: { missions: Mission[]; api: (e: string, 
                   <h3 className="font-semibold">{m.title} <span className="ml-1 text-xs text-foreground/40">({m.confidentiality}) {m.maxParticipants > 0 && `• Max: ${m.maxParticipants}`}</span></h3>
                   <p className="text-sm text-foreground/50">{m.description}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: m.visibility === "global" ? "var(--gold-500)" : "var(--clan-primary)" }}>
+                    <input type="checkbox" checked={m.visibility === "global"} onChange={(e) => api("/api/clan/${slug}/admin/missions", "PUT", { id: m.id, visibility: e.target.checked ? "global" : "internal" })} />
+                    Hub
+                  </label>
                   <select value={m.status} onChange={(e) => api("/api/clan/${slug}/admin/missions", "PUT", { id: m.id, status: e.target.value })} className={`${inp} w-auto`}>
                     {Object.entries(statusLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
