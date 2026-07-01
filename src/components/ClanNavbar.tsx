@@ -37,7 +37,6 @@ export default function ClanNavbar({ slug, clanName }: Props) {
   ];
 
   const privateLinks = [
-    { href: `/profil`, label: "Profil", minPerm: 1 },
     { href: `${base}/messagerie`, label: "Messages", minPerm: 1 },
     { href: `${base}/missions`, label: "Missions", minPerm: 1 },
     { href: `${base}/evenements`, label: "Evenements", minPerm: 1 },

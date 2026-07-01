@@ -11,6 +11,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
+  const clanSlug = (session as unknown as Record<string, unknown>)?.clanSlug as string | undefined;
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
 
@@ -69,6 +70,16 @@ export default function Navbar() {
         <ul className="hidden items-center gap-0.5 lg:flex">
           {publicLinks.map(l => <li key={l.href}><NavLink {...l} /></li>)}
           {session && privateLinks.map(l => <li key={l.href}><NavLink href={l.href} label={l.label} badge={(l as {badge?: number}).badge} /></li>)}
+          {session && clanSlug && (
+            <li>
+              <Link href={`/clan/${clanSlug}`}
+                className="rounded-sm border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition-all"
+                style={{ fontFamily: "var(--font-display)", borderColor: "#c9a84c40", color: "#c9a84c" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "#c9a84c"; e.currentTarget.style.background = "#c9a84c10"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "#c9a84c40"; e.currentTarget.style.background = "transparent"; }}
+              >Mon Clan</Link>
+            </li>
+          )}
           <li className="ml-2">
             {session ? (
               <Link href="/profil" className="relative flex items-center justify-center rounded-full transition-all"
@@ -115,6 +126,12 @@ export default function Navbar() {
             </>
           )}
           <div className="mt-3 flex flex-col gap-2">
+            {session && clanSlug && (
+              <Link href={`/clan/${clanSlug}`}
+                className="block w-full rounded-sm border px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em]"
+                style={{ fontFamily: "var(--font-display)", borderColor: "#c9a84c40", color: "#c9a84c" }}
+              >Mon Clan</Link>
+            )}
             {session ? (
               <Link href="/profil"
                 className="block w-full rounded-sm border px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em]"
