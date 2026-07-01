@@ -8,27 +8,38 @@ type Tag = { id: string; name: string; _count: { clans: number } };
 type User = { id: string; publicId: string; username: string; displayName: string; hubRole: string; mandalorien: boolean; clanId: string | null; clan: { name: string; slug: string } | null; createdAt: string };
 type Config = Record<string, string>;
 
-const tabs = ["Clans", "Utilisateurs", "Tags", "Config"] as const;
+const tabs = ["Clans", "Utilisateurs", "Tags", "Config", "Contacts"] as const;
 type Tab = typeof tabs[number];
 
 export default function HubAdminPage() {
   const { data: session } = useSession();
   const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string;
 
+  type ContactMsg = { id: string; name: string; email: string; type: string; subject: string; message: string; read: boolean; createdAt: string };
+
   const [tab, setTab] = useState<Tab>("Clans");
   const [clans, setClans] = useState<Clan[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [config, setConfig] = useState<Config>({});
+  const [contacts, setContacts] = useState<ContactMsg[]>([]);
   const [newClanName, setNewClanName] = useState("");
   const [newTagName, setNewTagName] = useState("");
   const [userSearch, setUserSearch] = useState("");
   const [msg, setMsg] = useState("");
   const [configEdit, setConfigEdit] = useState<Config>({});
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactFilter, setContactFilter] = useState<"all" | "unread">("unread");
+  const [openContact, setOpenContact] = useState<string | null>(null);
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(""), 3000); }
 
-  useEffect(() => { loadClans(); loadTags(); loadUsers(); loadConfig(); }, []);
+  async function loadContacts() {
+    const r = await fetch("/api/contact");
+    if (r.ok) setContacts(await r.json());
+  }
+
+  useEffect(() => { loadClans(); loadTags(); loadUsers(); loadConfig(); loadContacts(); }, []);
 
   async function loadClans() {
     const r = await fetch("/api/hub/admin/clans");
@@ -44,7 +55,30 @@ export default function HubAdminPage() {
   }
   async function loadConfig() {
     const r = await fetch("/api/hub/admin/config");
-    if (r.ok) { const d = await r.json(); setConfig(d); setConfigEdit(d); }
+    if (r.ok) {
+      const d = await r.json();
+      setConfig(d); setConfigEdit(d);
+      if (d.contactEmail) setContactEmail(d.contactEmail);
+    }
+  }
+
+  async function saveContactEmail() {
+    await fetch("/api/hub/admin/config", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...configEdit, contactEmail }),
+    });
+    flash("Email de contact sauvegardé.");
+  }
+
+  async function markContactRead(id: string, read: boolean) {
+    await fetch("/api/contact", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, read }) });
+    setContacts(prev => prev.map(c => c.id === id ? { ...c, read } : c));
+  }
+
+  async function deleteContact(id: string) {
+    await fetch("/api/contact", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    setContacts(prev => prev.filter(c => c.id !== id));
+    if (openContact === id) setOpenContact(null);
   }
 
   async function createClan() {
@@ -250,6 +284,80 @@ export default function HubAdminPage() {
             style={{ background: "#f2f2f5", color: "#000" }}>Sauvegarder</button>
         </div>
       )}
+
+      {/* ── Contacts ── */}
+      {tab === "Contacts" && (() => {
+        const unread = contacts.filter(c => !c.read).length;
+        const typeLabels: Record<string, string> = { rgpd: "RGPD", recrutement: "Recrutement", bug: "Bug", autre: "Autre" };
+        const displayed = contactFilter === "unread" ? contacts.filter(c => !c.read) : contacts;
+        return (
+          <div className="space-y-6">
+            {/* Email notification */}
+            <div className="rounded-sm border p-4 space-y-3" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
+              <h3 className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "#4a4a4a" }}>Email de notification</h3>
+              <p className="text-xs" style={{ color: "#6b7280" }}>Recevez un email à chaque nouvelle demande de contact.</p>
+              <div className="flex gap-2">
+                <input value={contactEmail} onChange={e => setContactEmail(e.target.value)}
+                  className="flex-1 rounded-sm border px-3 py-2 text-sm outline-none max-w-xs" style={inputStyle}
+                  placeholder="admin@exemple.com" type="email" />
+                <button onClick={saveContactEmail} className="rounded-sm px-4 py-2 text-sm font-semibold"
+                  style={{ background: "#f2f2f5", color: "#000" }}>Enregistrer</button>
+              </div>
+            </div>
+
+            {/* Filtres */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex gap-2">
+                {(["unread", "all"] as const).map(f => (
+                  <button key={f} onClick={() => setContactFilter(f)}
+                    className="rounded-sm border px-3 py-1.5 text-xs font-semibold"
+                    style={{ borderColor: contactFilter === f ? "#f2f2f5" : "#2a2a2a", color: contactFilter === f ? "#f2f2f5" : "#4a4a4a" }}>
+                    {f === "unread" ? `Non lues (${unread})` : `Toutes (${contacts.length})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {displayed.length === 0 && <p className="py-8 text-center text-sm" style={{ color: "#4a4a4a" }}>Aucune demande.</p>}
+
+            <div className="space-y-2">
+              {displayed.map(c => (
+                <div key={c.id} className="rounded-sm border" style={{ borderColor: c.read ? "#1a1a1a" : "#c9a84c30", background: c.read ? "#0a0a0a" : "#c9a84c08" }}>
+                  <div className="flex items-start gap-3 p-4 cursor-pointer" onClick={() => setOpenContact(openContact === c.id ? null : c.id)}>
+                    <div className="mt-1.5 h-2 w-2 rounded-full flex-shrink-0" style={{ background: c.read ? "#2a2a2a" : "#c9a84c" }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                        <span className="text-xs font-semibold uppercase tracking-[0.15em]" style={{ color: "#c9a84c" }}>{typeLabels[c.type] ?? c.type}</span>
+                        <span className="text-sm font-semibold" style={{ color: "#f2f2f5" }}>{c.name}</span>
+                        <span className="text-xs" style={{ color: "#4a4a4a" }}>{c.email}</span>
+                        <span className="text-xs ml-auto" style={{ color: "#3a3a3a" }}>{new Date(c.createdAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      {c.subject && <p className="text-xs" style={{ color: "#6b7280" }}>{c.subject}</p>}
+                    </div>
+                  </div>
+                  {openContact === c.id && (
+                    <div className="border-t px-4 pb-4 pt-3" style={{ borderColor: "#1a1a1a" }}>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "#e5e7eb" }}>{c.message}</p>
+                      <div className="mt-3 flex gap-2">
+                        {!c.read && (
+                          <button onClick={() => markContactRead(c.id, true)} className="rounded-sm border px-3 py-1.5 text-xs"
+                            style={{ borderColor: "#2a2a2a", color: "#9ca3af" }}>Marquer lu</button>
+                        )}
+                        <a href={`mailto:${c.email}?subject=Re: ${c.subject || "Votre demande"}`}
+                          className="rounded-sm border px-3 py-1.5 text-xs" style={{ borderColor: "#2a2a2a", color: "#9ca3af" }}>
+                          Répondre par email
+                        </a>
+                        <button onClick={() => deleteContact(c.id)} className="rounded-sm px-3 py-1.5 text-xs ml-auto"
+                          style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>Supprimer</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

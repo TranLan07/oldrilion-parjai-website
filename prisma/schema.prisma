@@ -346,3 +346,16 @@ model DictionaryEntry {
   french String @unique
   mandoa String
 }
+
+// ─── CONTACT HUB ─────────────────────────────────────────────────────────────
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  type      String   // "rgpd" | "autre" | "recrutement" | "bug"
+  subject   String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}

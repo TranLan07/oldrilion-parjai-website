@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import HeroButtons from "./HeroButtons";
 
 export const metadata = { title: "Le Hub — Réseau Mandalorien" };
 
@@ -32,20 +33,7 @@ export default async function HubHome() {
           Espace central regroupant les clans mandaloriens actifs.
           Rejoignez un clan, participez aux missions communes, échangez sur les canaux inter-clans.
         </p>
-        <div className="relative mt-8 flex items-center gap-4">
-          <Link href="/clans"
-            className="rounded-sm border px-6 py-3 text-sm font-semibold uppercase tracking-[0.14em] transition-all"
-            style={{ borderColor: "#f2f2f5", color: "#f2f2f5" }}
-          >
-            Voir les clans
-          </Link>
-          <Link href="/login"
-            className="rounded-sm px-6 py-3 text-sm font-semibold uppercase tracking-[0.14em] transition-all"
-            style={{ background: "#f2f2f5", color: "#000000" }}
-          >
-            Connexion
-          </Link>
-        </div>
+        <HeroButtons />
       </section>
 
       {/* ── Stats ── */}
