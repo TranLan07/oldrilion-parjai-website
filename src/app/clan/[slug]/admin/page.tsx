@@ -16,7 +16,7 @@ type Grade = { id: string; name: string; defaultPermission: number; order: numbe
 type DictEntry = { id: string; french: string; mandoa: string };
 type Spec = { id: string; name: string; description: string; defaultPermission: number; secret: boolean; order: number; _count: { users: number } };
 
-type Tab = "users" | "recruitment" | "channels" | "missions" | "evenements" | "pages" | "lore" | "rules" | "grades" | "specs" | "dictionary" | "tags";
+type Tab = "users" | "recruitment" | "channels" | "missions" | "evenements" | "pages" | "lore" | "rules" | "grades" | "specs" | "dictionary" | "tags" | "whitelist" | "theme" | "settings";
 
 const inp = "w-full rounded border border-accent-dim/30 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent";
 const btnDanger = "rounded bg-red-900/30 px-3 py-1.5 text-sm text-red-400 hover:bg-red-900/50";
@@ -48,6 +48,7 @@ export default function AdminPage() {
     users: "/api/clan/${slug}/admin/users", recruitment: "/api/clan/${slug}/admin/recruitment", channels: "/api/clan/${slug}/admin/channels",
     missions: "/api/clan/${slug}/admin/missions", evenements: "/api/clan/${slug}/admin/evenements", pages: "/api/clan/${slug}/admin/pages",
     lore: "/api/clan/${slug}/admin/lore", rules: "/api/clan/${slug}/admin/rules", grades: "/api/clan/${slug}/admin/grades", specs: "/api/clan/${slug}/admin/specializations", dictionary: "/api/clan/${slug}/admin/dictionary", tags: "/api/clan/${slug}/admin/tags",
+    whitelist: "/api/clan/${slug}/admin/whitelist", theme: "/api/clan/${slug}/admin/settings", settings: "/api/clan/${slug}/admin/settings",
   };
 
   const load = useCallback(async () => {
@@ -57,6 +58,7 @@ export default function AdminPage() {
     const m: Record<Tab, (d: unknown) => void> = {
       users: (d) => setUsers(d as User[]), recruitment: (d) => setRecruitments(d as Recruitment[]),
       channels: (d) => setChannels(d as Channel[]), missions: (d) => setMissions(d as Mission[]), evenements: () => {},
+      whitelist: () => {}, theme: () => {}, settings: () => {},
       pages: (d) => setPages(d as PagePerm[]), lore: (d) => setLoreSections(d as ContentSection[]),
       rules: (d) => setRuleSections(d as ContentSection[]), grades: (d) => setGrades(d as Grade[]),
       dictionary: (d) => setDictEntries(d as DictEntry[]),
@@ -94,6 +96,7 @@ export default function AdminPage() {
     { key: "missions", label: "Missions" }, { key: "evenements", label: "Evenements" }, { key: "lore", label: "Lore" },
     { key: "rules", label: "Règles" }, { key: "specs", label: "Spécialisations" },
     { key: "dictionary", label: "Dictionnaire" }, { key: "pages", label: "Permissions" }, { key: "tags", label: "Tags" },
+    { key: "whitelist", label: "Whitelist" }, { key: "theme", label: "Theme" }, { key: "settings", label: "Parametres" },
   ];
 
   return (
@@ -113,6 +116,9 @@ export default function AdminPage() {
       {tab === "channels" && <ChannelsTab channels={channels} users={users} grades={grades} specs={specs} api={api} load={load} />}
       {tab === "missions" && <MissionsTab missions={missions} api={api} />}
       {tab === "evenements" && <EvenementsTab slug={slug} />}
+      {tab === "whitelist" && <WhitelistTab slug={slug} />}
+      {tab === "theme" && <ThemeTab slug={slug} />}
+      {tab === "settings" && <SettingsTab slug={slug} />}
       {tab === "lore" && <ContentTab sections={loreSections} endpoint="/api/clan/${slug}/admin/lore" label="Lore" api={api} />}
       {tab === "rules" && <ContentTab sections={ruleSections} endpoint="/api/clan/${slug}/admin/rules" label="Règle" api={api} />}
       {tab === "specs" && <SpecsTab specs={specs} api={api} />}
@@ -1109,6 +1115,171 @@ function EvenementsTab({ slug }: { slug: string }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// -- WhitelistTab --
+function WhitelistTab({ slug }: { slug: string }) {
+  type WLEntry = { id: string; accessLevel: number; user: { id: string; publicId: string; displayName: string; username: string; clan: { name: string; colorPrimary: string } | null } };
+  const [list, setList] = useState<WLEntry[]>([]);
+  const [publicId, setPublicId] = useState("");
+  const [accessLevel, setAccessLevel] = useState("1");
+  const [msg, setMsg] = useState("");
+
+  function flash(m: string) { setMsg(m); setTimeout(() => setMsg(""), 3000); }
+  const loadWl = async () => {
+    const r = await fetch(`/api/clan/${slug}/admin/whitelist`);
+    if (r.ok) setList(await r.json());
+  };
+  useEffect(() => { loadWl(); }, []);
+
+  async function add() {
+    if (!publicId.trim()) return;
+    const r = await fetch(`/api/clan/${slug}/admin/whitelist`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ publicId: publicId.trim().toUpperCase(), accessLevel: Number(accessLevel) }),
+    });
+    const d = await r.json();
+    if (!r.ok) { flash(d.error); return; }
+    setPublicId(""); loadWl(); flash("Utilisateur ajoute a la whitelist.");
+  }
+
+  async function remove(id: string) {
+    await fetch(`/api/clan/${slug}/admin/whitelist`, {
+      method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
+    });
+    loadWl();
+  }
+
+  return (
+    <div className="space-y-6">
+      <p className="text-sm text-foreground/50">La whitelist permet a des utilisateurs d&apos;autres clans d&apos;acceder a certaines pages selon le niveau defini.</p>
+      {msg && <p className="text-sm" style={{ color: "var(--clan-primary, #c9a84c)" }}>{msg}</p>}
+      <div className="flex flex-wrap gap-2 items-end">
+        <div>
+          <label className="mb-1 block text-xs text-foreground/50">Identifiant public</label>
+          <input value={publicId} onChange={e => setPublicId(e.target.value.toUpperCase())} maxLength={6}
+            className={inp + " w-28 font-mono"} placeholder="XXXXXX" />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-foreground/50">Niveau (1-9)</label>
+          <input type="number" min={1} max={9} value={accessLevel} onChange={e => setAccessLevel(e.target.value)}
+            className={inp + " w-20"} />
+        </div>
+        <button onClick={add} className={btnPrimary}>Ajouter</button>
+      </div>
+      <div className="space-y-2">
+        {list.length === 0 && <p className="text-sm text-foreground/40">Aucun utilisateur en whitelist.</p>}
+        {list.map(e => (
+          <div key={e.id} className="flex items-center justify-between rounded border border-accent-dim/20 bg-surface p-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-sm text-foreground">{e.user.displayName}</span>
+              <span className="font-mono text-xs text-foreground/40">{e.user.publicId}</span>
+              {e.user.clan && <span className="text-xs" style={{ color: e.user.clan.colorPrimary }}>{e.user.clan.name}</span>}
+              <span className="rounded px-1.5 py-0.5 text-xs bg-surface-light text-foreground/60">Niv. {e.accessLevel}</span>
+            </div>
+            <button onClick={() => remove(e.id)} className={btnDanger}>Retirer</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// -- ThemeTab --
+function ThemeTab({ slug }: { slug: string }) {
+  const [colors, setColors] = useState({ colorBg: "#000000", colorPrimary: "#c9a84c", colorAccent: "#c0392b" });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => {
+      if (d) setColors({ colorBg: d.colorBg, colorPrimary: d.colorPrimary, colorAccent: d.colorAccent });
+    });
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    await fetch(`/api/clan/${slug}/admin/settings`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(colors),
+    });
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
+  }
+
+  const colorFields = [
+    { key: "colorBg" as const, label: "Fond" },
+    { key: "colorPrimary" as const, label: "Primaire (titres, accents)" },
+    { key: "colorAccent" as const, label: "Accent (degrade, badges)" },
+  ];
+
+  return (
+    <div className="space-y-6 max-w-sm">
+      <p className="text-sm text-foreground/50">Personnalisez les couleurs de votre espace clan.</p>
+      {colorFields.map(({ key, label }) => (
+        <div key={key}>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-foreground/50">{label}</label>
+          <div className="flex items-center gap-3">
+            <input type="color" value={colors[key]} onChange={e => setColors(c => ({ ...c, [key]: e.target.value }))}
+              className="h-10 w-16 cursor-pointer rounded border border-accent-dim/30 bg-background p-0.5" />
+            <input value={colors[key]} onChange={e => setColors(c => ({ ...c, [key]: e.target.value }))}
+              className={inp + " w-28 font-mono"} placeholder="#000000" maxLength={7} />
+            <div className="h-8 w-8 rounded border border-accent-dim/30" style={{ background: colors[key] }} />
+          </div>
+        </div>
+      ))}
+      <div className="rounded border border-accent-dim/20 bg-surface p-4">
+        <p className="mb-2 text-xs text-foreground/50 uppercase tracking-wider">Apercu</p>
+        <div className="h-2 rounded mb-2" style={{ background: `linear-gradient(90deg, ${colors.colorAccent}, ${colors.colorPrimary})` }} />
+        <p className="font-bold uppercase tracking-wider" style={{ fontFamily: "var(--font-display)", color: colors.colorPrimary }}>Nom du clan</p>
+      </div>
+      <button onClick={save} disabled={saving} className={btnPrimary + " disabled:opacity-50"}>
+        {saving ? "Sauvegarde..." : saved ? "Sauvegarde !" : "Appliquer"}
+      </button>
+    </div>
+  );
+}
+
+// -- SettingsTab --
+function SettingsTab({ slug }: { slug: string }) {
+  const [form, setForm] = useState({ description: "", anonRevealLevel: 5 });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => {
+      if (d) setForm({ description: d.description ?? "", anonRevealLevel: d.anonRevealLevel ?? 5 });
+    });
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    await fetch(`/api/clan/${slug}/admin/settings`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
+    });
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <div className="space-y-6 max-w-lg">
+      <div>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-foreground/50">Description du clan</label>
+        <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+          rows={4} className={inp + " resize-y"} placeholder="Decrivez votre clan..." />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-foreground/50">
+          Niveau minimum pour reveler un profil anonyme (1-10)
+        </label>
+        <p className="mb-2 text-xs text-foreground/40">
+          Les membres avec ce niveau de permission peuvent voir le vrai nom des membres en mode anonyme.
+        </p>
+        <input type="number" min={1} max={10} value={form.anonRevealLevel} onChange={e => setForm(f => ({ ...f, anonRevealLevel: Number(e.target.value) }))}
+          className={inp + " w-24"} />
+      </div>
+      <button onClick={save} disabled={saving} className={btnPrimary + " disabled:opacity-50"}>
+        {saving ? "Sauvegarde..." : saved ? "Sauvegarde !" : "Enregistrer"}
+      </button>
     </div>
   );
 }
