@@ -29,19 +29,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // First sign-in: populate token from DB
       if (user?.id) {
         token.userId = user.id;
-        const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          include: { clan: { select: { slug: true, name: true } } },
+        });
         if (dbUser) {
+          token.publicId = dbUser.publicId;
+          token.hubRole = dbUser.hubRole;
           token.role = dbUser.role;
+          token.clanId = dbUser.clanId ?? null;
+          token.clanSlug = dbUser.clan?.slug ?? null;
           token.grade = dbUser.grade;
           token.specialization = dbUser.specialization;
           token.permissionLevel = dbUser.permissionLevel;
           token.mustChangePassword = dbUser.mustChangePassword;
+          token.anonymous = dbUser.anonymous;
         }
       }
-      // Ensure userId is always set (fallback to sub which NextAuth sets to user.id)
       if (!token.userId && token.sub) {
         token.userId = token.sub;
       }
@@ -50,11 +56,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = (token.userId || token.sub) as string;
-        (session as unknown as Record<string, unknown>).role = token.role;
-        (session as unknown as Record<string, unknown>).grade = token.grade;
-        (session as unknown as Record<string, unknown>).specialization = token.specialization;
-        (session as unknown as Record<string, unknown>).permissionLevel = token.permissionLevel;
-        (session as unknown as Record<string, unknown>).mustChangePassword = token.mustChangePassword;
+        const s = session as unknown as Record<string, unknown>;
+        s.publicId = token.publicId;
+        s.hubRole = token.hubRole;
+        s.role = token.role;
+        s.clanId = token.clanId;
+        s.clanSlug = token.clanSlug;
+        s.grade = token.grade;
+        s.specialization = token.specialization;
+        s.permissionLevel = token.permissionLevel;
+        s.mustChangePassword = token.mustChangePassword;
+        s.anonymous = token.anonymous;
       }
       return session;
     },

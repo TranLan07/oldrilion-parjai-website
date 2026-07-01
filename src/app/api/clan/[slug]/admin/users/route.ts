@@ -1,0 +1,45 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requireClanAdmin, resolveClan, denied, notFound } from "@/lib/clan-auth";
+import { prisma } from "@/lib/prisma";
+
+type P = { params: Promise<{ slug: string }> };
+
+export async function GET(_: Request, { params }: P) {
+  const { slug } = await params;
+  if (!(await requireClanAdmin(slug))) return denied();
+  const clan = await resolveClan(slug);
+  if (!clan) return notFound();
+  const users = await prisma.user.findMany({
+    where: { clanId: clan.id },
+    select: { id: true, publicId: true, username: true, displayName: true, role: true, grade: true, gradeId: true, specialization: true, specializationId: true, permissionLevel: true, mustChangePassword: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return NextResponse.json(users);
+}
+
+export async function PUT(req: NextRequest, { params }: P) {
+  const { slug } = await params;
+  if (!(await requireClanAdmin(slug))) return denied();
+  const { id, gradeId, specializationId, grade, specialization, role, permissionLevel, displayName } = await req.json();
+  if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
+
+  const user = await prisma.user.update({ where: { id }, data: {
+    ...(displayName && { displayName }),
+    ...(role && { role }),
+    ...(grade !== undefined && { grade }),
+    ...(gradeId !== undefined && { gradeId }),
+    ...(specialization !== undefined && { specialization }),
+    ...(specializationId !== undefined && { specializationId }),
+    ...(permissionLevel !== undefined && { permissionLevel }),
+  }});
+  return NextResponse.json(user);
+}
+
+export async function DELETE(req: NextRequest, { params }: P) {
+  const { slug } = await params;
+  if (!(await requireClanAdmin(slug))) return denied();
+  const { id } = await req.json();
+  if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
+  await prisma.user.delete({ where: { id } });
+  return NextResponse.json({ success: true });
+}

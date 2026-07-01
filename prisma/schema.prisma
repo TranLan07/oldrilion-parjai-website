@@ -7,16 +7,143 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Grade {
-  id               String @id @default(cuid())
-  name             String @unique
-  defaultPermission Int   @default(1)
-  order            Int    @default(0)
-  users            User[]
+// ─── HUB ────────────────────────────────────────────────────────────────────
+
+model Clan {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  name         String   @unique
+  description  String   @default("")
+  colorBg      String   @default("#000000")
+  colorPrimary String   @default("#c9a84c")
+  colorAccent  String   @default("#c0392b")
+  createdAt    DateTime @default(now())
+
+  members       User[]
+  grades        Grade[]
+  specializations Specialization[]
+  channels      Channel[]
+  missions      Mission[]
+  events        Event[]
+  whitelist     ClanWhitelist[]
+  recruitments  Recruitment[]
+  loreSections  LoreSection[]
+  ruleSections  RuleSection[]
+  tags          ClanTag[]
+  pagePerms     PagePermission[]
+
+  // Config: niveau min pour qu'un admin de clan voie les vrais noms des anonymes
+  anonRevealLevel Int @default(5)
 }
+
+model Tag {
+  id    String    @id @default(cuid())
+  name  String    @unique
+  clans ClanTag[]
+}
+
+model ClanTag {
+  clanId String
+  tagId  String
+  clan   Clan @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@id([clanId, tagId])
+}
+
+// Max tags par clan, configurable par l'admin hub
+model HubConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+model ClanWhitelist {
+  id          String @id @default(cuid())
+  clanId      String
+  userId      String
+  accessLevel Int    @default(1)
+  clan        Clan   @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([clanId, userId])
+}
+
+// ─── UTILISATEURS ───────────────────────────────────────────────────────────
+
+model User {
+  id                  String   @id @default(cuid())
+  publicId            String   @unique  // 6 lettres majuscules
+  username            String   @unique
+  passwordHash        String
+  displayName         String
+  // Rôle hub
+  hubRole             String   @default("member")  // "member" | "moderator" | "admin"
+  // Appartenance clan (null = sans-clan)
+  clanId              String?
+  clan                Clan?    @relation(fields: [clanId], references: [id])
+  // Rôle au sein du clan
+  role                String   @default("membre")
+  // Grade (lié au clan)
+  gradeId             String?
+  gradeRef            Grade?          @relation(fields: [gradeId], references: [id])
+  grade               String          @default("Recrue")
+  // Spécialisation (liée au clan)
+  specializationId    String?
+  specializationRef   Specialization? @relation(fields: [specializationId], references: [id])
+  specialization      String          @default("")
+  publicSpecialization String         @default("")
+  permissionLevel     Int             @default(1)
+  mustChangePassword  Boolean         @default(false)
+  anonymous           Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  sentMessages     Message[]
+  channelMembers   ChannelMember[]
+  channelFollows   ChannelFollower[]
+  missionMembers   MissionMember[]
+  eventMembers     EventMember[]
+  recruitmentApp   Recruitment?       @relation("applicant")
+  whitelist        ClanWhitelist[]
+  contactsOwned    Contact[]          @relation("ContactOwner")
+  contactsTargeted Contact[]          @relation("ContactTarget")
+  notifications    Notification[]
+  reports          Report[]           @relation("reporter")
+  reportedAs       Report[]           @relation("reported_user")
+}
+
+// ─── GRADES & SPECS (scoped clan) ───────────────────────────────────────────
+
+model Grade {
+  id                String @id @default(cuid())
+  clanId            String
+  clan              Clan   @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  name              String
+  defaultPermission Int    @default(1)
+  order             Int    @default(0)
+  users             User[]
+  @@unique([clanId, name])
+}
+
+model Specialization {
+  id                String  @id @default(cuid())
+  clanId            String
+  clan              Clan    @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  name              String
+  description       String  @default("")
+  defaultPermission Int     @default(1)
+  secret            Boolean @default(false)
+  order             Int     @default(0)
+  users             User[]
+  events            Event[]
+  @@unique([clanId, name])
+}
+
+// ─── CONTENU CLAN ───────────────────────────────────────────────────────────
 
 model LoreSection {
   id          String @id @default(cuid())
+  clanId      String
+  clan        Clan   @relation(fields: [clanId], references: [id], onDelete: Cascade)
   order       Int
   title       String
   description String
@@ -24,70 +151,62 @@ model LoreSection {
 
 model RuleSection {
   id          String @id @default(cuid())
+  clanId      String
+  clan        Clan   @relation(fields: [clanId], references: [id], onDelete: Cascade)
   order       Int
   title       String
   description String
 }
 
-model User {
-  id            String   @id @default(cuid())
-  username      String   @unique
-  passwordHash  String
-  displayName   String
-  role          String   @default("membre")
-  gradeId           String?
-  gradeRef          Grade?          @relation(fields: [gradeId], references: [id])
-  grade             String          @default("Recrue")
-  specializationId  String?
-  specializationRef Specialization? @relation(fields: [specializationId], references: [id])
-  specialization    String          @default("")
-  publicSpecialization String       @default("")
-  permissionLevel   Int             @default(1)
-  mustChangePassword Boolean @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  sentMessages     Message[]
-  channelMembers   ChannelMember[]
-  channelFollows   ChannelFollower[]
-  missionMembers   MissionMember[]
-  recruitmentApplication Recruitment? @relation("applicant")
-}
-
 model Recruitment {
-  id          String   @id @default(cuid())
-  rpName      String
-  discord     String
-  experience  String
-  motivation  String
-  specialization String @default("")
-  status      String   @default("pending") // pending, approved, rejected
-  tempPassword String?
-  userId      String?  @unique
-  user        User?    @relation("applicant", fields: [userId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  clanId         String
+  clan           Clan     @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  rpName         String
+  discord        String
+  experience     String
+  motivation     String
+  specialization String   @default("")
+  status         String   @default("pending") // pending | approved | rejected
+  tempPassword   String?
+  userId         String?  @unique
+  user           User?    @relation("applicant", fields: [userId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model PagePermission {
-  id              String @id @default(cuid())
-  path            String @unique
-  label           String
-  minPermission   Int    @default(1)
+  id            String @id @default(cuid())
+  clanId        String
+  clan          Clan   @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  path          String  // chemin relatif au clan, ex: "lore", "membres"
+  label         String
+  minPermission Int    @default(1)
+  @@unique([clanId, path])
 }
 
-model Channel {
-  id              String   @id @default(cuid())
-  name            String   @unique
-  description     String   @default("")
-  isPrivate       Boolean  @default(false)
-  emailNotifEnabled Boolean @default(true)
-  emailNotifDelayMin Int   @default(120)
-  createdAt       DateTime @default(now())
+// ─── MESSAGERIE ─────────────────────────────────────────────────────────────
 
-  members     ChannelMember[]
-  messages    Message[]
-  followers   ChannelFollower[]
+model Channel {
+  id                String   @id @default(cuid())
+  // null = canal inter-clans (hub), sinon scoped à un clan
+  clanId            String?
+  clan              Clan?    @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  name              String
+  description       String   @default("")
+  isPrivate         Boolean  @default(false)
+  emailNotifEnabled Boolean  @default(true)
+  emailNotifDelayMin Int     @default(120)
+  createdAt         DateTime @default(now())
+
+  // Accès privé : grade, spec, ou liste d'IDs utilisateur
+  accessGrades String @default("[]")  // JSON array of grade names
+  accessSpecs  String @default("[]")  // JSON array of spec names
+  accessUsers  String @default("[]")  // JSON array of publicIds
+
+  members   ChannelMember[]
+  messages  Message[]
+  followers ChannelFollower[]
 }
 
 model ChannelMember {
@@ -97,21 +216,19 @@ model ChannelMember {
   muted     Boolean @default(false)
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-
   @@unique([userId, channelId])
 }
 
 model ChannelFollower {
-  id            String   @id @default(cuid())
-  email         String
-  channelId     String
-  userId        String
-  confirmed     Boolean  @default(false)
-  confirmToken  String   @unique
-  lastNotifAt   DateTime @default(now())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  channel       Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
-
+  id           String   @id @default(cuid())
+  email        String
+  channelId    String
+  userId       String
+  confirmed    Boolean  @default(false)
+  confirmToken String   @unique
+  lastNotifAt  DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel      Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   @@unique([userId, channelId])
 }
 
@@ -121,47 +238,110 @@ model Message {
   userId    String
   channelId String
   createdAt DateTime @default(now())
-
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
 }
 
-model Specialization {
-  id               String  @id @default(cuid())
-  name             String  @unique
-  description      String  @default("")
-  defaultPermission Int    @default(1)
-  secret           Boolean @default(false)
-  order            Int     @default(0)
-  users            User[]
-}
+// ─── MISSIONS ───────────────────────────────────────────────────────────────
 
 model Mission {
   id              String   @id @default(cuid())
+  // null = mission hub globale
+  clanId          String?
+  clan            Clan?    @relation(fields: [clanId], references: [id], onDelete: Cascade)
   title           String
   description     String
   status          String   @default("en_cours")
-  confidentiality String   @default("standard")
+  confidentiality String   @default("standard")   // "standard" | "dha"
+  visibility      String   @default("internal")   // "internal" | "global"
   maxParticipants Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-
-  members MissionMember[]
+  members         MissionMember[]
 }
 
 model MissionMember {
-  id        String  @id @default(cuid())
-  userId    String
-  missionId String
+  id            String  @id @default(cuid())
+  userId        String
+  missionId     String
   participating Boolean @default(true)
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mission   Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
-
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission       Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
   @@unique([userId, missionId])
 }
 
+// ─── ÉVÉNEMENTS ─────────────────────────────────────────────────────────────
+
+model Event {
+  id               String   @id @default(cuid())
+  clanId           String?
+  clan             Clan?    @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  title            String
+  description      String
+  status           String   @default("a_venir")  // "a_venir" | "en_cours" | "termine"
+  visibility       String   @default("internal") // "internal" | "private" | "global"
+  specializationId String?
+  specialization   Specialization? @relation(fields: [specializationId], references: [id])
+  maxParticipants  Int?
+  startAt          DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  members          EventMember[]
+}
+
+model EventMember {
+  id      String  @id @default(cuid())
+  userId  String
+  eventId String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  @@unique([userId, eventId])
+}
+
+// ─── CONTACTS & NOTIFICATIONS ───────────────────────────────────────────────
+
+model Contact {
+  id       String @id @default(cuid())
+  ownerId  String
+  targetId String
+  nickname String @default("")
+  owner    User   @relation("ContactOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  target   User   @relation("ContactTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  @@unique([ownerId, targetId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "message"|"mission"|"event"|"recruitment"|"whitelist"|"report"
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── SIGNALEMENTS ───────────────────────────────────────────────────────────
+
+model Report {
+  id           String   @id @default(cuid())
+  reporterId   String
+  reporter     User     @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType   String   // "user"|"clan"|"mission"|"event"
+  targetId     String
+  targetUserId String?
+  targetUser   User?    @relation("reported_user", fields: [targetUserId], references: [id])
+  reason       String
+  status       String   @default("pending") // "pending"|"resolved"|"escalated"
+  clanId       String?  // scope du signalement (null = hub)
+  createdAt    DateTime @default(now())
+}
+
+// ─── DICTIONNAIRE (global, pas scoped clan) ──────────────────────────────────
+
 model DictionaryEntry {
-  id      String @id @default(cuid())
-  french  String @unique
-  mandoa  String
+  id     String @id @default(cuid())
+  french String @unique
+  mandoa String
 }
