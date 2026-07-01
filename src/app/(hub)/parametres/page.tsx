@@ -33,9 +33,20 @@ export default function ParametresPage() {
   const [emailInputs, setEmailInputs] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
+  const [error, setError] = useState("");
+
   const load = useCallback(async () => {
-    const r = await fetch("/api/profil/settings");
-    if (r.ok) setSettings(await r.json());
+    try {
+      const r = await fetch("/api/profil/settings");
+      if (r.ok) {
+        setSettings(await r.json());
+      } else {
+        const d = await r.json().catch(() => ({}));
+        setError(d.error ?? `Erreur ${r.status}`);
+      }
+    } catch {
+      setError("Impossible de charger les paramètres.");
+    }
   }, []);
 
   useEffect(() => { if (session) load(); }, [session, load]);
@@ -95,6 +106,12 @@ export default function ParametresPage() {
   }
 
   if (!session) return <div className="p-12 text-center text-sm" style={{ color: "#6b7280" }}>Connectez-vous.</div>;
+  if (error) return (
+    <div className="p-12 text-center text-sm" style={{ color: "#ef4444" }}>
+      Erreur : {error}
+      <br /><button onClick={() => { setError(""); load(); }} className="mt-3 text-xs underline" style={{ color: "#9ca3af" }}>Réessayer</button>
+    </div>
+  );
   if (!settings) return <div className="p-12 text-center text-sm" style={{ color: "#6b7280" }}>Chargement...</div>;
 
   const hubChannels = settings.channels.filter(c => !c.clanId);
