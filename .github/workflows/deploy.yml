@@ -25,7 +25,7 @@ jobs:
             git pull origin master
 
             echo "==> Install dependencies"
-            npm ci --omit=dev
+            npm ci
 
             echo "==> Prisma: generate client"
             npx prisma generate
@@ -35,6 +35,9 @@ jobs:
 
             echo "==> Build Next.js"
             npm run build
+
+            echo "==> Prune devDependencies"
+            npm prune --omit=dev
 
             echo "==> Restart PM2"
             pm2 restart parjai --update-env
