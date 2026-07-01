@@ -9,9 +9,11 @@ export async function GET() {
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: {
-      id: true, displayName: true, username: true, role: true,
-      grade: true, specialization: true, publicSpecialization: true,
+      id: true, displayName: true, username: true,
+      publicId: true, hubRole: true, anonymous: true,
+      role: true, grade: true, specialization: true,
       permissionLevel: true,
+      clan: { select: { id: true, slug: true, name: true, colorPrimary: true } },
     },
   });
 
@@ -23,12 +25,11 @@ export async function PUT(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const { publicSpecialization } = await req.json();
+  const { displayName, anonymous } = await req.json();
+  const data: Record<string, unknown> = {};
+  if (displayName !== undefined && displayName.trim()) data.displayName = displayName.trim();
+  if (anonymous !== undefined) data.anonymous = Boolean(anonymous);
 
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { publicSpecialization: publicSpecialization || "" },
-  });
-
-  return NextResponse.json({ success: true });
+  const user = await prisma.user.update({ where: { id: session.user.id }, data });
+  return NextResponse.json({ success: true, anonymous: user.anonymous });
 }
