@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
-type Clan = { id: string; slug: string; name: string; _count: { members: number }; colorPrimary: string };
+type Clan = { id: string; slug: string; name: string; _count: { members: number }; colorPrimary: string; premium: boolean; suspended: boolean; suspendedReason: string | null };
 type Tag = { id: string; name: string; _count: { clans: number } };
 type User = { id: string; publicId: string; username: string; displayName: string; hubRole: string; mandalorien: boolean; clanId: string | null; clan: { name: string; slug: string } | null; createdAt: string };
 type Config = Record<string, string>;
@@ -42,7 +42,7 @@ export default function HubAdminPage() {
   const [hubEvents, setHubEvents] = useState<HubEvent[]>([]);
   const [eventForm, setEventForm] = useState({ title: "", description: "", maxParticipants: "", startAt: "" });
   const [webmasterInfo, setWebmasterInfo] = useState<Record<string, { username: string; password: string }>>({});
-  type DictEntry = { id: string; french: string; mandoa: string };
+  type DictEntry = { id: string; french: string; mandoa: string; isAuto?: boolean };
   const [dictEntries, setDictEntries] = useState<DictEntry[]>([]);
   const [dictSearch, setDictSearch] = useState("");
   const [dictShowForm, setDictShowForm] = useState(false);
@@ -50,6 +50,7 @@ export default function HubAdminPage() {
   const [dictEditing, setDictEditing] = useState<DictEntry | null>(null);
   const [dictDeleting, setDictDeleting] = useState<string | null>(null);
   const [dictConflict, setDictConflict] = useState<{ existing: DictEntry; newMandoa: string } | null>(null);
+  const [suspendReason, setSuspendReason] = useState<Record<string, string>>({});
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(""), 3000); }
 
@@ -137,6 +138,18 @@ export default function HubAdminPage() {
     loadClans();
   }
 
+
+  async function togglePremium(id: string, current: boolean) {
+    await fetch("/api/hub/admin/clans", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, premium: !current }) });
+    loadClans();
+  }
+
+  async function toggleSuspend(id: string, currentlySuspended: boolean) {
+    const reason = suspendReason[id] ?? "";
+    await fetch("/api/hub/admin/clans", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, suspended: !currentlySuspended, suspendedReason: reason }) });
+    setSuspendReason(prev => ({ ...prev, [id]: "" }));
+    loadClans();
+  }
   async function createTag() {
     if (!newTagName.trim()) return;
     const r = await fetch("/api/hub/admin/tags", {
@@ -213,8 +226,10 @@ export default function HubAdminPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {clans.map(clan => (
               <div key={clan.id} className="rounded-sm border p-4" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="font-bold uppercase tracking-[0.1em] text-sm" style={{ fontFamily: "var(--font-display)", color: clan.colorPrimary }}>{clan.name}</span>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="font-bold uppercase tracking-[0.1em] text-sm flex-1" style={{ fontFamily: "var(--font-display)", color: clan.colorPrimary }}>{clan.name}</span>
+                  {clan.premium && <span className="rounded-sm px-1.5 py-0.5 text-xs font-semibold" style={{ background: "rgba(201,168,76,0.15)", color: "#c9a84c", border: "1px solid rgba(201,168,76,0.3)" }}>★ Premium</span>}
+                  {clan.suspended && <span className="rounded-sm px-1.5 py-0.5 text-xs font-semibold" style={{ background: "rgba(192,57,43,0.15)", color: "#ef4444", border: "1px solid rgba(192,57,43,0.3)" }}>Suspendu</span>}
                   <span className="text-xs" style={{ color: "#4a4a4a" }}>{clan._count.members} mbr</span>
                 </div>
                 <p className="mb-3 text-xs" style={{ color: "#4a4a4a" }}>/clan/{clan.slug}</p>
@@ -233,8 +248,36 @@ export default function HubAdminPage() {
                   }} className="text-xs px-2 py-1 rounded-sm border" style={{ borderColor: "#2a2a2a", color: "#c9a84c" }}>
                     Accès webmaster
                   </button>
-                  <button onClick={() => { if (confirm(`Supprimer le clan "${clan.name}" et TOUTES ses données ?`)) deleteClan(clan.id); }}
+                  <button onClick={() => togglePremium(clan.id, clan.premium)}
+                    className="text-xs px-2 py-1 rounded-sm border"
+                    style={{ borderColor: clan.premium ? "#c9a84c30" : "#2a2a2a", color: clan.premium ? "#c9a84c" : "#6b7280" }}>
+                    {clan.premium ? "✓ Premium" : "Activer premium"}
+                  </button>
+                  <button onClick={() => { if (confirm(`Supprimer le clan "${clan.name}" et TOUTES ses données ? Les membres seront réinitialisés en sans-clan.`)) deleteClan(clan.id); }}
                     className="text-xs px-2 py-1 rounded-sm" style={{ background: "rgba(192,57,43,0.1)", color: "#ef4444" }}>Supprimer</button>
+                </div>
+                {/* Suspension */}
+                <div className="mt-3 space-y-1.5">
+                  {!clan.suspended && (
+                    <div className="flex items-center gap-1.5">
+                      <input value={suspendReason[clan.id] ?? ""} onChange={e => setSuspendReason(p => ({ ...p, [clan.id]: e.target.value }))}
+                        className="flex-1 rounded-sm border px-2 py-1 text-xs outline-none" style={{ background: "#111", borderColor: "#2a2a2a", color: "#9ca3af" }}
+                        placeholder="Motif (optionnel)..." />
+                      <button onClick={() => toggleSuspend(clan.id, false)}
+                        className="text-xs px-2 py-1 rounded-sm" style={{ background: "rgba(192,57,43,0.1)", color: "#ef4444" }}>
+                        Suspendre
+                      </button>
+                    </div>
+                  )}
+                  {clan.suspended && (
+                    <div className="flex items-center justify-between rounded-sm border px-2 py-1.5" style={{ borderColor: "rgba(192,57,43,0.2)", background: "rgba(192,57,43,0.05)" }}>
+                      <span className="text-xs" style={{ color: "#9ca3af" }}>{clan.suspendedReason ? `Motif: ${clan.suspendedReason}` : "Aucun motif"}</span>
+                      <button onClick={() => toggleSuspend(clan.id, true)}
+                        className="ml-2 text-xs px-2 py-0.5 rounded-sm" style={{ background: "rgba(34,197,94,0.1)", color: "#22c55e" }}>
+                        Lever la suspension
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {webmasterInfo[clan.id] && (
                   <div className="mt-3 rounded-sm border px-3 py-2 text-xs space-y-0.5" style={{ borderColor: "#c9a84c30", background: "rgba(201,168,76,0.05)" }}>
@@ -742,10 +785,14 @@ export default function HubAdminPage() {
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm" style={{ color: "#f2f2f5" }}>{e.french}</span>
                         <span style={{ color: "#3a3a3a" }}>→</span>
                         <span className="font-medium text-sm" style={{ color: "#c9a84c" }}>{e.mandoa}</span>
+                        {e.isAuto && (
+                          <span className="rounded-sm px-1.5 py-0.5 text-xs font-semibold"
+                            style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}>🤖 Auto</span>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => setDictEditing(e)} className="rounded-sm px-3 py-1.5 text-xs" style={{ background: "#1a1a1a", color: "#9ca3af" }}>Modifier</button>

@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireClanAdmin, denied, notFound, resolveClan } from "@/lib/clan-auth";
+import { requireClanAdmin, denied, notFound, resolveClan , suspendedResponse } from "@/lib/clan-auth";
 
 type P = { params: Promise<{ slug: string }> };
 
@@ -9,6 +9,7 @@ export async function GET(_req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
 
   const wl = await prisma.clanWhitelist.findMany({
     where: { clanId: clan.id },
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
 
   const { publicId, accessLevel } = await req.json();
   if (!publicId?.trim()) return NextResponse.json({ error: "PublicId requis" }, { status: 400 });
@@ -44,6 +46,7 @@ export async function DELETE(req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
 
   const { id } = await req.json();
   const entry = await prisma.clanWhitelist.findUnique({ where: { id } });

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notifyChannelFollowers } from "@/lib/notify-followers";
 import { publish } from "@/lib/sse-store";
+import { translateWithAutoGenerate } from "@/lib/mandoa-auto";
 
 type P = { params: Promise<{ slug: string; id: string }> };
 
@@ -22,6 +23,9 @@ export async function GET(_req: NextRequest, { params }: P) {
       await prisma.channelMember.create({ data: { userId: session.user!.id, channelId: id } });
     }
 
+    const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { mandalorien: true } });
+    const isMandalorien = userRecord?.mandalorien ?? false;
+
     const messages = await prisma.message.findMany({
       where: { channelId: id },
       include: { user: { select: { id: true, displayName: true, role: true, grade: true, anonymous: true, publicId: true } } },
@@ -29,7 +33,12 @@ export async function GET(_req: NextRequest, { params }: P) {
       take: 200,
     });
 
-    return NextResponse.json(messages);
+    const sanitized = messages.map(m => ({
+      ...m,
+      originalContent: (m.mandoa && isMandalorien) ? m.originalContent : null,
+    }));
+
+    return NextResponse.json(sanitized);
   } catch (e) {
     console.error("GET messages error:", e);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
@@ -56,12 +65,24 @@ export async function POST(req: NextRequest, { params }: P) {
 
     const body = await req.json();
     const content = body?.content;
+    const useMandoa = !!body?.mandoa;
     if (!content || typeof content !== "string" || !content.trim()) {
       return NextResponse.json({ error: "Message vide" }, { status: 400 });
     }
 
+    let finalContent = content.trim();
+    let originalContent: string | null = null;
+
+    if (useMandoa) {
+      const userRecord2 = await prisma.user.findUnique({ where: { id: session.user.id }, select: { mandalorien: true } });
+      if (userRecord2?.mandalorien) {
+        originalContent = finalContent;
+        finalContent = await translateWithAutoGenerate(finalContent);
+      }
+    }
+
     const message = await prisma.message.create({
-      data: { content: content.trim(), userId: session.user.id, channelId: id },
+      data: { content: finalContent, originalContent, mandoa: !!originalContent, userId: session.user.id, channelId: id },
       include: { user: { select: { id: true, displayName: true, role: true, grade: true, anonymous: true, publicId: true } } },
     });
 

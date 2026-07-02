@@ -13,16 +13,22 @@ export default function Navbar() {
   const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
   const clanSlug = (session as unknown as Record<string, unknown>)?.clanSlug as string | undefined;
   const [open, setOpen] = useState(false);
+  const [appOpen, setAppOpen] = useState(false);
   const [unread, setUnread] = useState(0);
 
   useEffect(() => { setOpen(false); }, [pathname]);
 
   useEffect(() => {
     if (!session) return;
-    const fetchCount = () => fetch("/api/notifications/count").then(r => r.ok ? r.json() : { count: 0 }).then(d => setUnread(d.count));
-    fetchCount();
-    const t = setInterval(fetchCount, 30000);
-    return () => clearInterval(t);
+    // Chargement initial
+    fetch("/api/notifications/count").then(r => r.ok ? r.json() : { count: 0 }).then(d => setUnread(d.count));
+    // SSE pour les mises à jour en temps réel
+    const es = new EventSource("/api/hub/notifications/sse");
+    es.onmessage = (e) => {
+      try { const d = JSON.parse(e.data); if (typeof d.count === "number") setUnread(d.count); } catch {}
+    };
+    es.onerror = () => es.close();
+    return () => es.close();
   }, [session]);
 
   const publicLinks = [
@@ -30,10 +36,14 @@ export default function Navbar() {
     { href: "/clans", label: "Clans" },
   ];
 
-  const privateLinks = [
+  const appLinks = [
     { href: "/messagerie", label: "Messages" },
     { href: "/missions", label: "Missions" },
     { href: "/evenements", label: "Événements" },
+    { href: "/marketplace", label: "Marketplace" },
+  ];
+
+  const privateLinks = [
     { href: "/traducteur", label: "Mando'a" },
     ...(hubRole === "admin" || hubRole === "moderator" ? [{ href: "/hub/admin", label: "Admin Hub" }] : []),
   ];
@@ -69,6 +79,29 @@ export default function Navbar() {
         {/* Desktop */}
         <ul className="hidden items-center gap-0.5 lg:flex">
           {publicLinks.map(l => <li key={l.href}><NavLink {...l} /></li>)}
+          {session && (
+            <li className="relative" onMouseEnter={() => setAppOpen(true)} onMouseLeave={() => setAppOpen(false)}>
+              <button className={`${linkStyle} relative inline-flex items-center gap-1`}
+                style={{ fontFamily: "var(--font-display)", color: appLinks.some(l => pathname === l.href) ? "#f2f2f5" : "#9ca3af" }}>
+                App
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              {appOpen && (
+                <div className="absolute left-0 top-full z-50 min-w-[160px] rounded-sm border py-1 shadow-lg"
+                  style={{ background: "#0e0e0e", borderColor: "#2a2a2a" }}>
+                  {appLinks.map(l => (
+                    <Link key={l.href} href={l.href}
+                      className="block px-4 py-2 text-sm font-semibold uppercase tracking-[0.1em] transition-colors"
+                      style={{ fontFamily: "var(--font-display)", color: pathname === l.href ? "#f2f2f5" : "#9ca3af" }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#e5e7eb"; (e.currentTarget as HTMLAnchorElement).style.background = "#161616"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = pathname === l.href ? "#f2f2f5" : "#9ca3af"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}>
+                      {l.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </li>
+          )}
           {session && privateLinks.map(l => <li key={l.href}><NavLink href={l.href} label={l.label} badge={(l as {badge?: number}).badge} /></li>)}
           {session && clanSlug && (
             <li>
@@ -119,10 +152,11 @@ export default function Navbar() {
       {open && (
         <div className="border-t px-4 pb-4 pt-2 lg:hidden" style={{ borderColor: "#2a2a2a", background: "#0a0a0a" }}>
           {publicLinks.map(l => <NavLink key={l.href} {...l} />)}
-          {session && privateLinks.length > 0 && (
+          {session && (
             <>
               <div className="my-2 h-px" style={{ background: "#2a2a2a" }} />
-              {privateLinks.map(l => <NavLink key={l.href} href={l.href} label={l.label} badge={(l as {badge?: number}).badge} />)}
+              {appLinks.map(l => <NavLink key={l.href} {...l} />)}
+              {privateLinks.map(l => <NavLink key={l.href} href={l.href} label={l.label} />)}
             </>
           )}
           <div className="mt-3 flex flex-col gap-2">

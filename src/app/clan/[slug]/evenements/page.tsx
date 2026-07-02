@@ -20,6 +20,8 @@ const statusMap: Record<string, { label: string; color: string }> = {
   termine:  { label: "Termine",  color: "#6b7280" },
 };
 
+const DEF_EV = { title: "", description: "", status: "a_venir", visibility: "internal", startAt: "" };
+
 export default function EvenementsPage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -27,6 +29,14 @@ export default function EvenementsPage() {
   const [events, setEvents] = useState<ClanEvent[]>([]);
   const [filter, setFilter] = useState("all");
   const userId = session?.user?.id;
+  const perm = ((session as unknown as Record<string, unknown>)?.permissionLevel as number) || 0;
+  const sessionClanSlug = (session as unknown as Record<string, unknown>)?.clanSlug as string | undefined;
+  const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
+  const isAdmin = (sessionClanSlug === slug && perm >= 10) || hubRole === "admin";
+  const [showCreate, setShowCreate] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState(DEF_EV);
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/clan/${slug}/evenements`);
@@ -34,6 +44,26 @@ export default function EvenementsPage() {
   }, [slug]);
 
   useEffect(() => { if (session) load(); }, [session, load]);
+
+  async function saveEvent(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true);
+    const method = editId ? "PUT" : "POST";
+    const body = editId ? { id: editId, ...form } : form;
+    await fetch(`/api/clan/${slug}/admin/evenements`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    setShowCreate(false); setEditId(null); setForm(DEF_EV); load(); setSaving(false);
+  }
+
+  async function deleteEvent(id: string) {
+    if (!confirm("Supprimer cet événement ?")) return;
+    await fetch(`/api/clan/${slug}/admin/evenements`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    load();
+  }
+
+  function startEdit(ev: ClanEvent) {
+    setEditId(ev.id);
+    setForm({ title: ev.title, description: ev.description, status: ev.status, visibility: ev.visibility, startAt: ev.startAt ? new Date(ev.startAt).toISOString().slice(0, 16) : "" });
+    setShowCreate(true);
+  }
 
   async function toggleJoin(eventId: string, isJoined: boolean) {
     await fetch(`/api/clan/${slug}/evenements/${eventId}/join`, {
@@ -50,11 +80,43 @@ export default function EvenementsPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <div className="mb-8">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--clan-accent, #4a4a4a)" }}>Clan</p>
-        <h1 className="text-4xl font-bold uppercase tracking-[0.14em]"
-          style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #f2f2f5)" }}>Evenements</h1>
+      <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--clan-accent, #4a4a4a)" }}>Clan</p>
+          <h1 className="text-4xl font-bold uppercase tracking-[0.14em]"
+            style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #f2f2f5)" }}>Evenements</h1>
+        </div>
+        {isAdmin && (
+          <button onClick={() => { setShowCreate(!showCreate); setEditId(null); setForm(DEF_EV); }}
+            className="rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
+            style={{ borderColor: accentColor, color: accentColor }}>+ Événement</button>
+        )}
       </div>
+
+      {showCreate && isAdmin && (
+        <form onSubmit={saveEvent} className="mb-6 rounded-sm border p-5 space-y-3" style={{ borderColor: "#2a2a2a", background: "#0a0a0a" }}>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.15em]" style={{ color: accentColor, fontFamily: "var(--font-display)" }}>
+            {editId ? "Modifier l'événement" : "Nouvel événement"}
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required
+              className="rounded border px-3 py-2 text-sm outline-none" style={{ background: "#111", borderColor: "#2a2a2a", color: "#f2f2f5" }} placeholder="Titre *" />
+            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
+              className="rounded border px-3 py-2 text-sm outline-none" style={{ background: "#111", borderColor: "#2a2a2a", color: "#f2f2f5" }}>
+              {["a_venir", "en_cours", "termine"].map(s => <option key={s} value={s}>{statusMap[s]?.label ?? s}</option>)}
+            </select>
+          </div>
+          <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2}
+            className="w-full rounded border px-3 py-2 text-sm outline-none" style={{ background: "#111", borderColor: "#2a2a2a", color: "#f2f2f5" }} placeholder="Description" />
+          <input type="datetime-local" value={form.startAt} onChange={e => setForm({ ...form, startAt: e.target.value })}
+            className="rounded border px-3 py-2 text-sm outline-none" style={{ background: "#111", borderColor: "#2a2a2a", color: "#f2f2f5" }} />
+          <div className="flex gap-3">
+            <button type="submit" disabled={saving} className="rounded-sm px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] disabled:opacity-50"
+              style={{ background: accentColor, color: "#1a1408" }}>{saving ? "..." : editId ? "Enregistrer" : "Créer"}</button>
+            <button type="button" onClick={() => { setShowCreate(false); setEditId(null); }} className="rounded-sm px-3 py-2 text-xs" style={{ color: "#6b7280" }}>Annuler</button>
+          </div>
+        </form>
+      )}
 
       <div className="mb-6 flex flex-wrap gap-2">
         {["all", "a_venir", "en_cours", "termine"].map(k => {
@@ -109,18 +171,21 @@ export default function EvenementsPage() {
                   </div>
                 </div>
 
-                {ev.status !== "termine" && (
-                  <button
-                    onClick={() => !isFull && toggleJoin(ev.id, isJoined)}
-                    disabled={isFull}
-                    className="shrink-0 rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      borderColor: isJoined ? "#22c55e" : accentColor,
-                      color: isJoined ? "#22c55e" : accentColor,
-                    }}>
-                    {isFull ? "Complet" : isJoined ? "Inscrit" : "Rejoindre"}
-                  </button>
-                )}
+                <div className="flex shrink-0 flex-col gap-2 items-end">
+                  {ev.status !== "termine" && (
+                    <button onClick={() => !isFull && toggleJoin(ev.id, isJoined)} disabled={isFull}
+                      className="rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ borderColor: isJoined ? "#22c55e" : accentColor, color: isJoined ? "#22c55e" : accentColor }}>
+                      {isFull ? "Complet" : isJoined ? "Inscrit" : "Rejoindre"}
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <div className="flex gap-1.5">
+                      <button onClick={() => startEdit(ev)} className="rounded px-2 py-1 text-xs" style={{ color: "#9ca3af", border: "1px solid #2a2a2a" }}>✏</button>
+                      <button onClick={() => deleteEvent(ev.id)} className="rounded px-2 py-1 text-xs" style={{ color: "#ef4444", border: "1px solid #2a2a2a" }}>✕</button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {ev.members.length > 0 && (

@@ -31,6 +31,7 @@ export default function AdminPage() {
   const { data: session } = useSession();
   const perm = ((session as unknown as Record<string, unknown>)?.permissionLevel as number) || 0;
   const [tab, setTab] = useState<Tab>("users");
+  const [clanPremium, setClanPremium] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
   const [recruitments, setRecruitments] = useState<Recruitment[]>([]);
@@ -78,6 +79,12 @@ export default function AdminPage() {
 
   useEffect(() => { if (perm >= 10) load(); }, [perm, load]);
 
+  useEffect(() => {
+    if (perm >= 10 && slug) {
+      fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => { if (d) setClanPremium(d.premium); });
+    }
+  }, [perm, slug]);
+
   if (!session || perm < 10) {
     return <div className="p-12 text-center text-foreground/50">Accès réservé aux administrateurs (niveau 10)</div>;
   }
@@ -111,15 +118,15 @@ export default function AdminPage() {
       {tab === "users" && <UsersTab users={users} grades={grades} specs={specs} api={api} load={load} />}
       {tab === "recruitment" && <RecruitmentTab recruitments={recruitments} slug={slug} load={load} />}
       {tab === "grades" && <GradesTab grades={grades} api={api} />}
-      {tab === "channels" && <ChannelsTab channels={channels} users={users} grades={grades} specs={specs} slug={slug} api={api} load={load} />}
-      {tab === "missions" && <MissionsTab missions={missions} api={api} />}
+      {tab === "channels" && <ChannelsTab channels={channels} users={users} grades={grades} specs={specs} slug={slug} premium={clanPremium} api={api} load={load} />}
+      {tab === "missions" && <MissionsTab missions={missions} premium={clanPremium} api={api} />}
       {tab === "evenements" && <EvenementsTab slug={slug} />}
       {tab === "whitelist" && <WhitelistTab slug={slug} />}
       {tab === "theme" && <ThemeTab slug={slug} />}
       {tab === "settings" && <SettingsTab slug={slug} />}
       {tab === "lore" && <ContentTab sections={loreSections} endpoint={`/api/clan/${slug}/admin/lore`} label="Lore" api={api} />}
       {tab === "rules" && <ContentTab sections={ruleSections} endpoint={`/api/clan/${slug}/admin/rules`} label="Règle" api={api} />}
-      {tab === "specs" && <SpecsTab specs={specs} api={api} />}
+      {tab === "specs" && <SpecsTab specs={specs} premium={clanPremium} api={api} />}
       {tab === "pages" && <PagesTab pages={pages} api={api} />}
       {tab === "tags" && <TagsTab slug={slug} />}
     </div>
@@ -318,8 +325,8 @@ function GradesTab({ grades, api }: { grades: Grade[]; api: (e: string, m: strin
 }
 
 // ── Channels ──
-function ChannelsTab({ channels, users, grades, specs, slug, api, load }: {
-  channels: Channel[]; users: User[]; grades: Grade[]; specs: Spec[]; slug: string;
+function ChannelsTab({ channels, users, grades, specs, slug, premium, api, load }: {
+  channels: Channel[]; users: User[]; grades: Grade[]; specs: Spec[]; slug: string; premium: boolean;
   api: (e: string, m: string, b?: object) => Promise<void>; load: () => void;
 }) {
   const [showForm, setShowForm] = useState(false);
@@ -435,7 +442,10 @@ function ChannelsTab({ channels, users, grades, specs, slug, api, load }: {
           </div>
         </div>
       ) : (
-        <button onClick={() => setShowForm(true)} className={btnPrimary}>+ Nouveau canal</button>
+        <>
+          <button onClick={() => setShowForm(true)} className={btnPrimary}>+ Nouveau canal</button>
+          {!premium && channels.length >= 1 && <p className="mt-2 text-xs" style={{ color: "#c9a84c" }}>★ Fonctionnalité premium : un seul canal disponible en version gratuite.</p>}
+        </>
       )}
 
       {channels.map(c => (
@@ -509,7 +519,7 @@ function ChannelsTab({ channels, users, grades, specs, slug, api, load }: {
 }
 
 // ── Missions ──
-function MissionsTab({ missions, api }: { missions: Mission[]; api: (e: string, m: string, b?: object) => Promise<void> }) {
+function MissionsTab({ missions, premium, api }: { missions: Mission[]; premium: boolean; api: (e: string, m: string, b?: object) => Promise<void> }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", confidentiality: "standard", maxParticipants: 0, visibility: "internal" });
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -543,8 +553,8 @@ function MissionsTab({ missions, api }: { missions: Mission[]; api: (e: string, 
             <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className={`resize-none ${inp}`} placeholder="Détails de la mission..." />
           </div>
           <label className="flex items-center gap-2 text-sm text-foreground/60 cursor-pointer">
-            <input type="checkbox" checked={form.visibility === "global"} onChange={e => setForm({ ...form, visibility: e.target.checked ? "global" : "internal" })} />
-            Publier sur le Hub inter-clans
+            <input type="checkbox" checked={form.visibility === "global"} onChange={e => setForm({ ...form, visibility: e.target.checked ? "global" : "internal" })} disabled={!premium} />
+            Publier sur le Hub inter-clans {!premium && <span style={{ color: "#c9a84c", fontSize: "11px" }}>★ Premium</span>}
           </label>
           <div className="flex gap-2">
             <button onClick={create} className={btnGreen}>Créer</button>
@@ -742,7 +752,7 @@ function PagesTab({ pages, api }: { pages: PagePerm[]; api: (e: string, m: strin
 }
 
 // ── Specializations ──
-function SpecsTab({ specs, api }: { specs: Spec[]; api: (e: string, m: string, b?: object) => Promise<void> }) {
+function SpecsTab({ specs, premium, api }: { specs: Spec[]; premium: boolean; api: (e: string, m: string, b?: object) => Promise<void> }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", description: "", defaultPermission: 1, secret: false, order: 0 });
   const [editing, setEditing] = useState<Spec | null>(null);
@@ -769,7 +779,7 @@ function SpecsTab({ specs, api }: { specs: Spec[]; api: (e: string, m: string, b
             </div>
             <div><label className="mb-1 block text-xs text-foreground/50">Ordre</label><input type="number" value={form.order} onChange={e => setForm({ ...form, order: parseInt(e.target.value) || 0 })} className={inp} /></div>
             <div className="flex items-end"><label className="flex items-center gap-2 text-sm text-foreground/60 cursor-pointer pb-2">
-              <input type="checkbox" checked={form.secret} onChange={e => setForm({ ...form, secret: e.target.checked })} className="accent-purple-500" /> Spé secrète
+              <input type="checkbox" checked={form.secret} onChange={e => setForm({ ...form, secret: e.target.checked })} disabled={!premium} className="accent-purple-500" /> Spé secrète {!premium && <span style={{ color: "#c9a84c" }}>★</span>}
             </label></div>
           </div>
           <div><label className="mb-1 block text-xs text-foreground/50">Description</label>

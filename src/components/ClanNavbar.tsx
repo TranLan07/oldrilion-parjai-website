@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 
-type Props = { slug: string; clanName: string };
+type Props = { slug: string; clanName: string; diplomacyPublic?: boolean };
 
 const linkStyle = "block px-3 py-2 text-sm font-semibold uppercase tracking-[0.14em] transition-colors";
 
-export default function ClanNavbar({ slug, clanName }: Props) {
+export default function ClanNavbar({ slug, clanName, diplomacyPublic }: Props) {
   const base = `/clan/${slug}`;
   const pathname = usePathname();
   const { data: session } = useSession();
@@ -33,6 +33,7 @@ export default function ClanNavbar({ slug, clanName }: Props) {
     { href: `${base}/lore`, label: "Lore" },
     { href: `${base}/membres`, label: "Membres" },
     { href: `${base}/regles`, label: "Règles" },
+    ...(diplomacyPublic ? [{ href: `${base}/diplomatie`, label: "Diplomatie" }] : []),
     ...(!session ? [{ href: `${base}/recrutement`, label: "Recrutement" }] : []),
   ];
 
@@ -40,6 +41,8 @@ export default function ClanNavbar({ slug, clanName }: Props) {
     { href: `${base}/messagerie`, label: "Messages", minPerm: 1 },
     { href: `${base}/missions`, label: "Missions", minPerm: 1 },
     { href: `${base}/evenements`, label: "Evenements", minPerm: 1 },
+    { href: `${base}/banque`, label: "Banque", minPerm: 1 },
+    ...(!diplomacyPublic ? [{ href: `${base}/diplomatie`, label: "Diplomatie", minPerm: 1 }] : []),
     { href: `${base}/admin`, label: "Admin", minPerm: 10 },
   ];
 

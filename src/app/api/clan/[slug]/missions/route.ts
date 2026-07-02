@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { resolveClan, notFound } from "@/lib/clan-auth";
+import { resolveClan, notFound , suspendedResponse } from "@/lib/clan-auth";
 
 type P = { params: Promise<{ slug: string }> };
 
@@ -12,6 +12,7 @@ export async function GET(req: NextRequest, { params }: P) {
   const { slug } = await params;
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
 
   const perm = ((session as unknown as Record<string, unknown>)?.permissionLevel as number) || 0;
   const mode = req.nextUrl.searchParams.get("mode") || "standard";

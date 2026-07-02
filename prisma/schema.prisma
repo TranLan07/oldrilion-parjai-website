@@ -34,6 +34,24 @@ model Clan {
 
   // Config: niveau min pour qu'un admin de clan voie les vrais noms des anonymes
   anonRevealLevel Int @default(5)
+
+  // Freemium
+  premium      Boolean   @default(false)
+  premiumSince DateTime?
+
+  // Suspension
+  suspended       Boolean   @default(false)
+  suspendedReason String?
+  suspendedAt     DateTime?
+
+  // Banque
+  bankBalance Int @default(0)
+
+  bankTransactions ClanBankTransaction[]
+  marketplaceListings MarketplaceListing[]
+  diplomacyOwned   DiplomacyEntry[] @relation("DiplomacyOwner")
+  diplomacyTargeted DiplomacyEntry[] @relation("DiplomacyTarget")
+  diplomacyTags    DiplomacyTag[]
 }
 
 model Tag {
@@ -112,6 +130,8 @@ model User {
   notifications    Notification[]
   reports          Report[]           @relation("reporter")
   reportedAs       Report[]           @relation("reported_user")
+  marketplaceListings MarketplaceListing[]
+  bankTransactionsAuthored ClanBankTransaction[]
 }
 
 // ─── GRADES & SPECS (scoped clan) ───────────────────────────────────────────
@@ -135,6 +155,7 @@ model Specialization {
   description       String  @default("")
   defaultPermission Int     @default(1)
   secret            Boolean @default(false)
+  color             String?
   order             Int     @default(0)
   users             User[]
   events            Event[]
@@ -238,13 +259,15 @@ model ChannelFollower {
 }
 
 model Message {
-  id        String   @id @default(cuid())
-  content   String
-  userId    String
-  channelId String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  id              String   @id @default(cuid())
+  content         String
+  userId          String
+  channelId       String
+  mandoa          Boolean  @default(false)
+  originalContent String?
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel         Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
 }
 
 // ─── MISSIONS ───────────────────────────────────────────────────────────────
@@ -347,9 +370,65 @@ model Report {
 // ─── DICTIONNAIRE (global, pas scoped clan) ──────────────────────────────────
 
 model DictionaryEntry {
-  id     String @id @default(cuid())
-  french String @unique
+  id     String  @id @default(cuid())
+  french String  @unique
   mandoa String
+  isAuto Boolean @default(false)
+}
+
+// ─── MARKETPLACE ─────────────────────────────────────────────────────────────
+
+model MarketplaceListing {
+  id          String    @id @default(cuid())
+  sellerId    String
+  seller      User      @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  clanId      String?
+  clan        Clan?     @relation(fields: [clanId], references: [id])
+  title       String
+  description String
+  price       Int
+  anonymous   Boolean   @default(false)
+  status      String    @default("active") // "active" | "sold" | "cancelled"
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+}
+
+// ─── BANQUE DE CLAN ──────────────────────────────────────────────────────────
+
+model ClanBankTransaction {
+  id        String   @id @default(cuid())
+  clanId    String
+  clan      Clan     @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  type      String   // "depot" | "retrait"
+  amount    Int
+  label     String?
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// ─── DIPLOMATIE ──────────────────────────────────────────────────────────────
+
+model DiplomacyEntry {
+  id           String         @id @default(cuid())
+  clanId       String
+  clan         Clan           @relation("DiplomacyOwner", fields: [clanId], references: [id], onDelete: Cascade)
+  type         String         // "allie" | "ennemi"
+  targetClanId String?
+  targetClan   Clan?          @relation("DiplomacyTarget", fields: [targetClanId], references: [id], onDelete: SetNull)
+  customName   String?
+  order        Int            @default(0)
+  createdAt    DateTime       @default(now())
+  tags         DiplomacyTag[]
+}
+
+model DiplomacyTag {
+  id      String           @id @default(cuid())
+  clanId  String
+  clan    Clan             @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  name    String
+  entries DiplomacyEntry[]
+  @@unique([clanId, name])
 }
 
 // ─── CONTACT HUB ─────────────────────────────────────────────────────────────

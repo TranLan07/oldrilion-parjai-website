@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireClanAdmin, resolveClan, denied, notFound } from "@/lib/clan-auth";
+import { requireClanAdmin, resolveClan, denied, notFound , suspendedResponse } from "@/lib/clan-auth";
 import { prisma } from "@/lib/prisma";
 
 type P = { params: Promise<{ slug: string }> };
@@ -9,6 +9,7 @@ export async function GET(_: Request, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const missions = await prisma.mission.findMany({
     where: { clanId: clan.id },
     include: { members: { include: { user: { select: { id: true, displayName: true } } } } },
@@ -22,6 +23,7 @@ export async function POST(req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const { title, description, confidentiality, maxParticipants, memberIds, visibility } = await req.json();
   if (!title) return NextResponse.json({ error: "Titre requis" }, { status: 400 });
   const mission = await prisma.mission.create({
@@ -29,7 +31,8 @@ export async function POST(req: NextRequest, { params }: P) {
       clanId: clan.id, title, description: description || "",
       confidentiality: confidentiality || "standard",
       maxParticipants: maxParticipants || 0,
-      visibility: visibility === "global" ? "global" : "internal",
+      // Freemium gate : visibility global/private nécessite premium
+    visibility: clan.premium ? (visibility || "internal") : "internal",
       members: memberIds?.length ? { create: memberIds.map((userId: string) => ({ userId })) } : undefined,
     },
   });

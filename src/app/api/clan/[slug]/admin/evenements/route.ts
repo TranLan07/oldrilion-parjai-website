@@ -1,6 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireClanAdmin, denied, notFound, resolveClan } from "@/lib/clan-auth";
+import { requireClanAdmin, denied, notFound, resolveClan , suspendedResponse } from "@/lib/clan-auth";
 
 type P = { params: Promise<{ slug: string }> };
 
@@ -9,6 +9,7 @@ export async function GET(_req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
 
   const events = await prisma.event.findMany({
     where: { clanId: clan.id },
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
 
   const { title, description, status, visibility, specializationId, maxParticipants, startAt } = await req.json();
   if (!title?.trim()) return NextResponse.json({ error: "Titre requis" }, { status: 400 });
@@ -35,7 +37,8 @@ export async function POST(req: NextRequest, { params }: P) {
       clanId: clan.id, title: title.trim(),
       description: description?.trim() || "",
       status: status || "a_venir",
-      visibility: visibility || "internal",
+      // Freemium gate : visibility global/private nécessite premium
+      visibility: clan.premium ? (visibility || "internal") : "internal",
       specializationId: specializationId || null,
       maxParticipants: maxParticipants ? Number(maxParticipants) : null,
       startAt: startAt ? new Date(startAt) : null,
@@ -47,6 +50,9 @@ export async function POST(req: NextRequest, { params }: P) {
 export async function PUT(req: NextRequest, { params }: P) {
   const { slug } = await params;
   if (!(await requireClanAdmin(slug))) return denied();
+  const clan = await resolveClan(slug);
+  if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
 
   const { id, ...data } = await req.json();
   const event = await prisma.event.update({
@@ -60,7 +66,7 @@ export async function PUT(req: NextRequest, { params }: P) {
       ...(data.maxParticipants !== undefined && { maxParticipants: data.maxParticipants ? Number(data.maxParticipants) : null }),
       ...(data.startAt !== undefined && { startAt: data.startAt ? new Date(data.startAt) : null }),
       // Proposer au Hub : passe hubStatus en "pending" (doit être approuvé par admin hub)
-      ...(data.proposeHub === true && { hubStatus: "pending" }),
+      ...(data.proposeHub === true && clan.premium && { hubStatus: "pending" }),
       ...(data.proposeHub === false && { hubStatus: "none" }),
     },
   });

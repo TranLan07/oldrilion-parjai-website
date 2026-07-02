@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireClanAdmin, resolveClan, denied, notFound } from "@/lib/clan-auth";
+import { requireClanAdmin, resolveClan, denied, notFound , suspendedResponse } from "@/lib/clan-auth";
 import { prisma } from "@/lib/prisma";
 
 type P = { params: Promise<{ slug: string }> };
@@ -9,6 +9,7 @@ export async function GET(_: Request, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const channels = await prisma.channel.findMany({
     where: { clanId: clan.id },
     include: {
@@ -25,8 +26,15 @@ export async function POST(req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const { name, description, isPrivate, memberIds, grades, specializations } = await req.json();
   if (!name) return NextResponse.json({ error: "Nom requis" }, { status: 400 });
+
+  // Freemium : 1 canal max si pas premium
+  if (!clan.premium) {
+    const count = await prisma.channel.count({ where: { clanId: clan.id } });
+    if (count >= 1) return NextResponse.json({ error: "Fonctionnalité premium : créez plus d'un canal en passant en premium." }, { status: 403 });
+  }
 
   const userIdSet = new Set<string>(memberIds || []);
   if (grades?.length) {

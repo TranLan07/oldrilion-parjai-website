@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireClanAdmin, resolveClan, denied, notFound } from "@/lib/clan-auth";
+import { requireClanAdmin, resolveClan, denied, notFound , suspendedResponse } from "@/lib/clan-auth";
 import { prisma } from "@/lib/prisma";
 import { hashSync } from "bcryptjs";
 import { generatePublicId } from "@/lib/public-id";
@@ -11,6 +11,7 @@ export async function GET(_: Request, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const recruitments = await prisma.recruitment.findMany({
     where: { clanId: clan.id },
     include: { user: { select: { username: true } } },
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest, { params }: P) {
   const { slug } = await params;
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const { rpName, discord, experience, motivation, specialization } = await req.json();
   if (!rpName || !discord || !experience || !motivation) {
     return NextResponse.json({ error: "Tous les champs sont requis" }, { status: 400 });
@@ -38,6 +40,7 @@ export async function PUT(req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
 
   const { id, action } = await req.json();
   if (!id || !action) return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });

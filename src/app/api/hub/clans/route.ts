@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const clans = await prisma.clan.findMany({
+    where: { suspended: false },
     include: {
       tags: { include: { tag: true } },
       _count: { select: { members: true } },

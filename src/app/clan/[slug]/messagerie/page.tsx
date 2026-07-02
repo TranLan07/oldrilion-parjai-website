@@ -12,6 +12,7 @@ type Channel = {
 };
 type Message = {
   id: string; content: string; createdAt: string;
+  mandoa: boolean; originalContent: string | null;
   user: { id: string; displayName: string; role: string; grade: string; anonymous: boolean; publicId: string };
 };
 type UserOption = { id: string; displayName: string };
@@ -30,6 +31,8 @@ export default function MessageriePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMsg, setNewMsg] = useState("");
   const [sending, setSending] = useState(false);
+  const [mandoaMode, setMandoaMode] = useState(false);
+  const isMandalorien = ((session as unknown as Record<string, unknown>)?.mandalorien as boolean) || false;
   const [showAdmin, setShowAdmin] = useState(false);
   const [showFollow, setShowFollow] = useState(false);
   const [followEmail, setFollowEmail] = useState("");
@@ -116,7 +119,7 @@ export default function MessageriePage() {
     setSending(true);
     const res = await fetch(`/api/clan/${slug}/channels/${activeId}/messages`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: newMsg }),
+      body: JSON.stringify({ content: newMsg, mandoa: mandoaMode }),
     });
     if (res.ok) { setNewMsg(""); }
     setSending(false);
@@ -313,7 +316,19 @@ export default function MessageriePage() {
                       {new Date(msg.createdAt).toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
                     </span>
                   </div>
-                  <p className="text-sm break-words" style={{ color: "var(--beskar-200)" }}>{msg.content}</p>
+                  {msg.mandoa ? (
+                    <div>
+                      <p className="text-sm break-words italic" style={{ color: "var(--clan-primary, var(--gold-500))" }}>{msg.content}</p>
+                      {msg.originalContent && isMandalorien && (
+                        <details className="mt-0.5">
+                          <summary className="cursor-pointer text-xs" style={{ color: "var(--beskar-500)" }}>Voir la traduction</summary>
+                          <p className="mt-1 text-sm" style={{ color: "var(--beskar-300)" }}>{msg.originalContent}</p>
+                        </details>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm break-words" style={{ color: "var(--beskar-200)" }}>{msg.content}</p>
+                  )}
                 </div>
               </div>
             );
@@ -327,10 +342,18 @@ export default function MessageriePage() {
               <p className="text-center text-sm" style={{ color: "var(--red-600)" }}>Vous êtes muté sur ce canal.</p>
             ) : (
               <div className="flex gap-2">
+                {isMandalorien && (
+                  <button type="button" onClick={() => setMandoaMode(!mandoaMode)}
+                    className="rounded px-3 py-2 text-xs font-semibold shrink-0"
+                    title={mandoaMode ? "Mode Mando'a actif" : "Activer le mode Mando'a"}
+                    style={{ background: mandoaMode ? "rgba(201,168,76,0.2)" : "var(--beskar-800)", borderWidth: 1, borderStyle: "solid", borderColor: mandoaMode ? "var(--clan-primary, var(--gold-500))" : "var(--beskar-600)", color: mandoaMode ? "var(--clan-primary, var(--gold-500))" : "var(--beskar-400)" }}>
+                    Mando&apos;a
+                  </button>
+                )}
                 <input type="text" value={newMsg} onChange={e => setNewMsg(e.target.value)}
-                  placeholder={`Message #${active?.name ?? ""}...`}
+                  placeholder={mandoaMode ? `Message en Mando'a...` : `Message #${active?.name ?? ""}...`}
                   className="flex-1 rounded border px-4 py-2 text-sm outline-none"
-                  style={{ background: "var(--beskar-800)", borderColor: "var(--beskar-600)", color: "var(--beskar-100)" }}
+                  style={{ background: "var(--beskar-800)", borderColor: mandoaMode ? "var(--clan-primary, var(--gold-500))40" : "var(--beskar-600)", color: "var(--beskar-100)" }}
                   disabled={sending} />
                 <button type="submit" disabled={sending || !newMsg.trim()}
                   className="rounded px-5 py-2 text-sm font-semibold disabled:opacity-50"

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireClanAdmin, resolveClan, denied, notFound } from "@/lib/clan-auth";
+import { requireClanAdmin, resolveClan, denied, notFound , suspendedResponse } from "@/lib/clan-auth";
 import { prisma } from "@/lib/prisma";
 
 type P = { params: Promise<{ slug: string }> };
@@ -9,6 +9,7 @@ export async function GET(_: Request, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const users = await prisma.user.findMany({
     where: { clanId: clan.id },
     select: { id: true, publicId: true, username: true, displayName: true, role: true, grade: true, gradeId: true, specialization: true, specializationId: true, permissionLevel: true, mustChangePassword: true, createdAt: true },
@@ -25,6 +26,7 @@ export async function PUT(req: NextRequest, { params }: P) {
 
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const target = await prisma.user.findUnique({ where: { id }, select: { clanId: true } });
   if (!target || target.clanId !== clan.id) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
 

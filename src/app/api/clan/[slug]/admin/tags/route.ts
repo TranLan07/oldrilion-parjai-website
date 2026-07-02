@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireClanAdmin, resolveClan, denied, notFound } from "@/lib/clan-auth";
+import { requireClanAdmin, resolveClan, denied, notFound , suspendedResponse } from "@/lib/clan-auth";
 import { prisma } from "@/lib/prisma";
 
 type P = { params: Promise<{ slug: string }> };
@@ -9,6 +9,7 @@ export async function GET(_: Request, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const clanTags = await prisma.clanTag.findMany({
     where: { clanId: clan.id },
     include: { tag: true },
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
 
   const { tagId } = await req.json();
   if (!tagId) return NextResponse.json({ error: "tagId requis" }, { status: 400 });
@@ -44,6 +46,7 @@ export async function DELETE(req: NextRequest, { params }: P) {
   if (!(await requireClanAdmin(slug))) return denied();
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const { tagId } = await req.json();
   await prisma.clanTag.delete({ where: { clanId_tagId: { clanId: clan.id, tagId } } });
   return NextResponse.json({ success: true });

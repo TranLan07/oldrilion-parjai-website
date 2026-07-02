@@ -22,6 +22,8 @@ const statusMap: Record<string, { label: string; color: string }> = {
   ratee:      { label: "Ratee",      color: "#ef4444" },
 };
 
+const DEFAULT_FORM = { title: "", description: "", status: "en_cours", visibility: "internal", maxParticipants: 0 };
+
 export default function MissionsPage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -30,8 +32,15 @@ export default function MissionsPage() {
   const [filter, setFilter] = useState("all");
   const userId = session?.user?.id;
   const perm = ((session as unknown as Record<string, unknown>)?.permissionLevel as number) || 0;
+  const sessionClanSlug = (session as unknown as Record<string, unknown>)?.clanSlug as string | undefined;
+  const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
+  const isAdmin = (sessionClanSlug === slug && perm >= 10) || hubRole === "admin";
   const canDha = perm >= 7;
   const [mode, setMode] = useState<"standard" | "dha">("standard");
+  const [showCreate, setShowCreate] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState(DEFAULT_FORM);
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/clan/${slug}/missions?mode=${mode}`);
@@ -39,6 +48,26 @@ export default function MissionsPage() {
   }, [slug, mode]);
 
   useEffect(() => { if (session) load(); }, [session, load]);
+
+  async function saveMission(e: React.FormEvent) {
+    e.preventDefault(); setSaving(true);
+    const method = editId ? "PUT" : "POST";
+    const body = editId ? { id: editId, ...form } : form;
+    await fetch(`/api/clan/${slug}/admin/missions`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    setShowCreate(false); setEditId(null); setForm(DEFAULT_FORM); load(); setSaving(false);
+  }
+
+  async function deleteMission(id: string) {
+    if (!confirm("Supprimer cette mission ?")) return;
+    await fetch(`/api/clan/${slug}/admin/missions`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    load();
+  }
+
+  function startEdit(m: Mission) {
+    setEditId(m.id);
+    setForm({ title: m.title, description: m.description, status: m.status, visibility: m.visibility, maxParticipants: m.maxParticipants });
+    setShowCreate(true);
+  }
 
   async function toggleParticipation(missionId: string, current: boolean) {
     await fetch(`/api/clan/${slug}/missions/${missionId}/participate`, {
@@ -66,18 +95,46 @@ export default function MissionsPage() {
             {isDha ? "Classifiees" : "Missions"}
           </h1>
         </div>
-        {canDha && (
-          <button
-            onClick={() => { setMode(isDha ? "standard" : "dha"); setFilter("all"); }}
-            className="rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-all"
-            style={{
-              borderColor: isDha ? "#a259e0" : "var(--clan-primary, #c9a84c)",
-              color: isDha ? "#a259e0" : "var(--clan-primary, #c9a84c)",
-            }}>
-            {isDha ? "Mode standard" : "Mode Dha"}
-          </button>
-        )}
+        <div className="flex gap-2">
+          {isAdmin && (
+            <button onClick={() => { setShowCreate(!showCreate); setEditId(null); setForm(DEFAULT_FORM); }}
+              className="rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em]"
+              style={{ borderColor: accentColor, color: accentColor }}>
+              + Mission
+            </button>
+          )}
+          {canDha && (
+            <button onClick={() => { setMode(isDha ? "standard" : "dha"); setFilter("all"); }}
+              className="rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-all"
+              style={{ borderColor: isDha ? "#a259e0" : "var(--clan-primary, #c9a84c)", color: isDha ? "#a259e0" : "var(--clan-primary, #c9a84c)" }}>
+              {isDha ? "Mode standard" : "Mode Dha"}
+            </button>
+          )}
+        </div>
       </div>
+
+      {showCreate && isAdmin && (
+        <form onSubmit={saveMission} className="mb-6 rounded-sm border p-5 space-y-3" style={{ borderColor: "#2a2a2a", background: "#0a0a0a" }}>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.15em]" style={{ color: accentColor, fontFamily: "var(--font-display)" }}>
+            {editId ? "Modifier la mission" : "Nouvelle mission"}
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required
+              className="rounded border px-3 py-2 text-sm outline-none" style={{ background: "#111", borderColor: "#2a2a2a", color: "#f2f2f5" }} placeholder="Titre *" />
+            <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
+              className="rounded border px-3 py-2 text-sm outline-none" style={{ background: "#111", borderColor: "#2a2a2a", color: "#f2f2f5" }}>
+              {["en_cours", "validee", "abandonnee", "ratee"].map(s => <option key={s} value={s}>{statusMap[s]?.label ?? s}</option>)}
+            </select>
+          </div>
+          <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2}
+            className="w-full rounded border px-3 py-2 text-sm outline-none" style={{ background: "#111", borderColor: "#2a2a2a", color: "#f2f2f5" }} placeholder="Description" />
+          <div className="flex gap-3">
+            <button type="submit" disabled={saving} className="rounded-sm px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] disabled:opacity-50"
+              style={{ background: accentColor, color: "#1a1408" }}>{saving ? "..." : editId ? "Enregistrer" : "Créer"}</button>
+            <button type="button" onClick={() => { setShowCreate(false); setEditId(null); }} className="rounded-sm px-3 py-2 text-xs" style={{ color: "#6b7280" }}>Annuler</button>
+          </div>
+        </form>
+      )}
 
       {/* Filtres statut */}
       <div className="mb-6 flex flex-wrap gap-2">
@@ -141,19 +198,27 @@ export default function MissionsPage() {
                   </p>
                 </div>
 
-                {mission.status === "en_cours" && (
-                  <button
-                    onClick={() => !isFull && toggleParticipation(mission.id, isParticipating)}
-                    disabled={isFull}
-                    className="shrink-0 rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      borderColor: isParticipating ? "#22c55e" : accentColor,
-                      color: isParticipating ? "#22c55e" : accentColor,
-                      background: isParticipating ? "rgba(34,197,94,0.08)" : `color-mix(in srgb, var(--clan-primary, #c9a84c) 8%, transparent)`,
-                    }}>
-                    {isFull ? "Complet" : isParticipating ? "Participant" : "Participer"}
-                  </button>
-                )}
+                <div className="flex shrink-0 flex-col gap-2 items-end">
+                  {mission.status === "en_cours" && (
+                    <button
+                      onClick={() => !isFull && toggleParticipation(mission.id, isParticipating)}
+                      disabled={isFull}
+                      className="rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        borderColor: isParticipating ? "#22c55e" : accentColor,
+                        color: isParticipating ? "#22c55e" : accentColor,
+                        background: isParticipating ? "rgba(34,197,94,0.08)" : `color-mix(in srgb, var(--clan-primary, #c9a84c) 8%, transparent)`,
+                      }}>
+                      {isFull ? "Complet" : isParticipating ? "Participant" : "Participer"}
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <div className="flex gap-1.5">
+                      <button onClick={() => startEdit(mission)} className="rounded px-2 py-1 text-xs" style={{ color: "#9ca3af", border: "1px solid #2a2a2a" }}>✏</button>
+                      <button onClick={() => deleteMission(mission.id)} className="rounded px-2 py-1 text-xs" style={{ color: "#ef4444", border: "1px solid #2a2a2a" }}>✕</button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {mission.members.length > 0 && (

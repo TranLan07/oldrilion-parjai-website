@@ -27,7 +27,7 @@ export async function PUT(req: NextRequest) {
   if (!(await requireHubAdmin())) return hubDenied();
   const { id, french, mandoa } = await req.json();
   if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
-  const entry = await prisma.dictionaryEntry.update({ where: { id }, data: { ...(french && { french: french.trim().toLowerCase() }), ...(mandoa && { mandoa: mandoa.trim() }) } });
+  const entry = await prisma.dictionaryEntry.update({ where: { id }, data: { ...(french && { french: french.trim().toLowerCase() }), ...(mandoa && { mandoa: mandoa.trim() }), isAuto: false } });
   return NextResponse.json(entry);
 }
 

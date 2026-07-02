@@ -28,3 +28,7 @@ export function denied() {
 export function notFound() {
   return NextResponse.json({ error: "Clan introuvable" }, { status: 404 });
 }
+
+export function suspendedResponse() {
+  return NextResponse.json({ error: "Ce clan est suspendu" }, { status: 403 });
+}
