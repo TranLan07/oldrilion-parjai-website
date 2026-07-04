@@ -29,6 +29,9 @@ export default function AdminPage() {
   const slug = params.slug as string;
   const { data: session } = useSession();
   const perm = ((session as unknown as Record<string, unknown>)?.permissionLevel as number) || 0;
+  const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
+  // Les admins hub ont accès à l'admin de TOUS les clans, quel que soit leur niveau.
+  const canAdmin = perm >= 10 || hubRole === "admin";
   const [tab, setTab] = useState<Tab>("users");
   const [clanPremium, setClanPremium] = useState(false);
 
@@ -76,15 +79,15 @@ export default function AdminPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  useEffect(() => { if (perm >= 10) load(); }, [perm, load]);
+  useEffect(() => { if (canAdmin) load(); }, [canAdmin, load]);
 
   useEffect(() => {
-    if (perm >= 10 && slug) {
+    if (canAdmin && slug) {
       fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => { if (d) setClanPremium(d.premium); });
     }
-  }, [perm, slug]);
+  }, [canAdmin, slug]);
 
-  if (!session || perm < 10) {
+  if (!session || !canAdmin) {
     return <div className="p-12 text-center text-foreground/50">Accès réservé aux administrateurs (niveau 10)</div>;
   }
 

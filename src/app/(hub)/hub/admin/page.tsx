@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 type Clan = { id: string; slug: string; name: string; _count: { members: number }; colorPrimary: string; premium: boolean; suspended: boolean; suspendedReason: string | null };
 type Tag = { id: string; name: string; _count: { clans: number } };
-type User = { id: string; publicId: string; username: string; displayName: string; hubRole: string; mandalorien: boolean; clanId: string | null; clan: { name: string; slug: string } | null; createdAt: string };
+type User = { id: string; publicId: string; username: string; displayName: string; hubRole: string; role: string; permissionLevel: number; mandalorien: boolean; clanId: string | null; clan: { name: string; slug: string } | null; createdAt: string };
 type Config = Record<string, string>;
 
 const tabs = ["Clans", "Utilisateurs", "Tags", "Config", "Contacts", "Messagerie", "Missions", "Événements", "Dictionnaire"] as const;
@@ -29,6 +29,10 @@ export default function HubAdminPage() {
   const [newClanName, setNewClanName] = useState("");
   const [newTagName, setNewTagName] = useState("");
   const [userSearch, setUserSearch] = useState("");
+  const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ displayName: "", hubRole: "member", clanId: "", permissionLevel: "1" });
+  const [resetPw, setResetPw] = useState<Record<string, string>>({});
+  const [savingUser, setSavingUser] = useState(false);
   const [msg, setMsg] = useState("");
   const [configEdit, setConfigEdit] = useState<Config>({});
   const [contactEmail, setContactEmail] = useState("");
@@ -167,14 +171,57 @@ export default function HubAdminPage() {
     loadTags();
   }
 
-  async function banUser(id: string) {
-    await fetch("/api/hub/admin/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, banned: true }) });
-    flash("Utilisateur banni.");
+  function startEditUser(u: User) {
+    setEditUserId(u.id);
+    setEditForm({
+      displayName: u.displayName,
+      hubRole: u.hubRole,
+      clanId: u.clanId ?? "",
+      permissionLevel: String(u.permissionLevel),
+    });
+  }
+
+  async function saveUser(id: string) {
+    setSavingUser(true);
+    const r = await fetch("/api/hub/admin/users", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id,
+        displayName: editForm.displayName,
+        hubRole: editForm.hubRole,
+        clanId: editForm.clanId || null,
+        permissionLevel: Number(editForm.permissionLevel),
+      }),
+    });
+    const d = await r.json();
+    setSavingUser(false);
+    if (!r.ok) { flash(`Erreur : ${d.error}`); return; }
+    flash("Utilisateur mis à jour.");
+    setEditUserId(null);
     loadUsers();
+  }
+
+  async function resetUserPassword(id: string) {
+    const r = await fetch("/api/hub/admin/users", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, resetPassword: true }),
+    });
+    const d = await r.json();
+    if (!r.ok) { flash(`Erreur : ${d.error}`); return; }
+    setResetPw(prev => ({ ...prev, [id]: d.tempPassword }));
   }
 
   async function toggleMandalorien(id: string, current: boolean) {
     await fetch("/api/hub/admin/users", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, mandalorien: !current }) });
+    loadUsers();
+  }
+
+  async function deleteUser(id: string) {
+    const r = await fetch("/api/hub/admin/users", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    const d = await r.json();
+    if (!r.ok) { flash(`Erreur : ${d.error}`); return; }
+    flash("Utilisateur supprimé.");
+    setEditUserId(null);
     loadUsers();
   }
 
@@ -188,6 +235,7 @@ export default function HubAdminPage() {
     return <div className="p-12 text-center" style={{ color: "#6b7280" }}>Accès réservé aux administrateurs hub.</div>;
   }
 
+  const isSuperAdmin = hubRole === "admin";
   const filteredUsers = users.filter(u =>
     !userSearch || u.displayName.toLowerCase().includes(userSearch.toLowerCase()) || u.username.toLowerCase().includes(userSearch.toLowerCase())
   );
@@ -294,55 +342,109 @@ export default function HubAdminPage() {
 
       {/* ── Utilisateurs ── */}
       {tab === "Utilisateurs" && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <input value={userSearch} onChange={e => setUserSearch(e.target.value)}
-            className="rounded-sm border px-3 py-2 text-sm outline-none w-72" style={inputStyle}
+            className="rounded-sm border px-3 py-2 text-sm outline-none w-full sm:w-72" style={inputStyle}
             placeholder="Rechercher par nom ou username..." />
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left" style={{ borderColor: "#1a1a1a" }}>
-                  {["ID", "Nom", "Username", "Clan", "Rôle hub", "Mandalorien", "Actions"].map(h => (
-                    <th key={h} className="pb-3 pr-4 text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: "#4a4a4a" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map(u => (
-                  <tr key={u.id} className="border-b" style={{ borderColor: "#111" }}>
-                    <td className="py-2.5 pr-4 font-mono text-xs" style={{ color: "#4a4a4a" }}>{u.publicId}</td>
-                    <td className="py-2.5 pr-4" style={{ color: "#e5e7eb" }}>{u.displayName}</td>
-                    <td className="py-2.5 pr-4" style={{ color: "#6b7280" }}>@{u.username}</td>
-                    <td className="py-2.5 pr-4" style={{ color: "#6b7280" }}>{u.clan?.name ?? <span style={{ color: "#3a3a3a" }}>Sans clan</span>}</td>
-                    <td className="py-2.5 pr-4">
-                      <span className="rounded-sm px-1.5 py-0.5 text-xs" style={{ background: u.hubRole === "admin" ? "rgba(255,255,255,0.1)" : "#111", color: u.hubRole === "admin" ? "#f2f2f5" : "#4a4a4a" }}>
-                        {u.hubRole}
-                      </span>
-                    </td>
-                    <td className="py-2.5 pr-4">
-                      {u.clanId ? (
-                        <span className="text-xs rounded-sm px-1.5 py-0.5" style={{ background: "rgba(201,168,76,0.1)", color: "#c9a84c" }}>Auto</span>
-                      ) : (
+          {!isSuperAdmin && (
+            <p className="text-xs" style={{ color: "#c9a84c" }}>Lecture seule — la gestion des utilisateurs est réservée aux administrateurs hub.</p>
+          )}
+
+          {filteredUsers.map(u => {
+            const editing = editUserId === u.id;
+            return (
+              <div key={u.id} className="rounded-sm border" style={{ borderColor: editing ? "#c9a84c40" : "#1e1e1e", background: "#0d0d0d" }}>
+                {/* En-tête carte */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                  <span className="font-mono text-xs" style={{ color: "#4a4a4a" }}>{u.publicId}</span>
+                  <span className="font-semibold" style={{ color: "#e5e7eb" }}>{u.displayName}</span>
+                  <span className="text-xs" style={{ color: "#6b7280" }}>@{u.username}</span>
+                  <span className="rounded-sm px-1.5 py-0.5 text-xs" style={{ background: u.hubRole === "admin" ? "rgba(255,255,255,0.12)" : u.hubRole === "moderator" ? "rgba(201,168,76,0.12)" : "#111", color: u.hubRole === "admin" ? "#f2f2f5" : u.hubRole === "moderator" ? "#c9a84c" : "#4a4a4a" }}>
+                    {u.hubRole}
+                  </span>
+                  <span className="text-xs" style={{ color: u.clan ? "#9ca3af" : "#3a3a3a" }}>
+                    {u.clan ? `${u.clan.name} · niv.${u.permissionLevel}` : "Sans clan"}
+                  </span>
+                  {u.mandalorien && <span className="text-xs rounded-sm px-1.5 py-0.5" style={{ background: "rgba(201,168,76,0.1)", color: "#c9a84c" }}>Mando</span>}
+                  {isSuperAdmin && (
+                    <button onClick={() => editing ? setEditUserId(null) : startEditUser(u)}
+                      className="ml-auto text-xs px-3 py-1 rounded-sm border" style={{ borderColor: "#2a2a2a", color: editing ? "#c9a84c" : "#9ca3af" }}>
+                      {editing ? "Fermer" : "Éditer"}
+                    </button>
+                  )}
+                </div>
+
+                {/* Panneau d'édition */}
+                {editing && isSuperAdmin && (
+                  <div className="border-t px-4 py-4 space-y-4" style={{ borderColor: "#1a1a1a" }}>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="text-xs uppercase tracking-wider" style={{ color: "#6b7280" }}>Nom affiché</span>
+                        <input value={editForm.displayName} onChange={e => setEditForm({ ...editForm, displayName: e.target.value })}
+                          className="mt-1 w-full rounded-sm border px-3 py-2 text-sm outline-none" style={inputStyle} />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs uppercase tracking-wider" style={{ color: "#6b7280" }}>Rôle hub (global)</span>
+                        <select value={editForm.hubRole} onChange={e => setEditForm({ ...editForm, hubRole: e.target.value })}
+                          className="mt-1 w-full rounded-sm border px-3 py-2 text-sm outline-none" style={inputStyle}>
+                          <option value="member">member</option>
+                          <option value="moderator">moderator</option>
+                          <option value="admin">admin</option>
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-xs uppercase tracking-wider" style={{ color: "#6b7280" }}>Clan</span>
+                        <select value={editForm.clanId} onChange={e => setEditForm({ ...editForm, clanId: e.target.value })}
+                          className="mt-1 w-full rounded-sm border px-3 py-2 text-sm outline-none" style={inputStyle}>
+                          <option value="">Sans clan</option>
+                          {clans.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-xs uppercase tracking-wider" style={{ color: "#6b7280" }}>Permission clan (niveau)</span>
+                        <input type="number" min={0} value={editForm.permissionLevel} onChange={e => setEditForm({ ...editForm, permissionLevel: e.target.value })}
+                          className="mt-1 w-full rounded-sm border px-3 py-2 text-sm outline-none" style={inputStyle} />
+                      </label>
+                    </div>
+
+                    <p className="text-xs" style={{ color: "#3a3a3a" }}>
+                      Changer de clan réinitialise grade et spécialisation. Un membre de clan est automatiquement Mandalorien.
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button onClick={() => saveUser(u.id)} disabled={savingUser}
+                        className="text-xs px-4 py-2 rounded-sm font-semibold disabled:opacity-50" style={{ background: "#f2f2f5", color: "#000" }}>
+                        {savingUser ? "..." : "Enregistrer"}
+                      </button>
+                      {!u.clanId && (
                         <button onClick={() => toggleMandalorien(u.id, u.mandalorien)}
-                          className="text-xs px-2 py-1 rounded-sm border transition-all"
-                          style={{
-                            borderColor: u.mandalorien ? "#c9a84c" : "#2a2a2a",
-                            color: u.mandalorien ? "#c9a84c" : "#4a4a4a",
-                            background: u.mandalorien ? "rgba(201,168,76,0.08)" : "transparent",
-                          }}>
-                          {u.mandalorien ? "Octroye" : "Octroyer"}
+                          className="text-xs px-3 py-2 rounded-sm border" style={{ borderColor: u.mandalorien ? "#c9a84c" : "#2a2a2a", color: u.mandalorien ? "#c9a84c" : "#6b7280" }}>
+                          {u.mandalorien ? "Retirer Mando" : "Octroyer Mando"}
                         </button>
                       )}
-                    </td>
-                    <td className="py-2.5">
-                      <button onClick={() => { if (confirm(`Bannir ${u.displayName} ?`)) banUser(u.id); }}
-                        className="text-xs px-2 py-1 rounded-sm" style={{ background: "rgba(192,57,43,0.1)", color: "#ef4444" }}>Ban</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      <button onClick={() => resetUserPassword(u.id)}
+                        className="text-xs px-3 py-2 rounded-sm border" style={{ borderColor: "#2a2a2a", color: "#9ca3af" }}>
+                        Réinitialiser le mot de passe
+                      </button>
+                      <button onClick={() => { if (confirm(`Supprimer définitivement ${u.displayName} (@${u.username}) ?`)) deleteUser(u.id); }}
+                        className="ml-auto text-xs px-3 py-2 rounded-sm" style={{ background: "rgba(192,57,43,0.12)", color: "#ef4444" }}>
+                        Supprimer
+                      </button>
+                    </div>
+
+                    {resetPw[u.id] && (
+                      <div className="rounded-sm border px-3 py-2 text-xs space-y-0.5" style={{ borderColor: "#c9a84c30", background: "rgba(201,168,76,0.05)" }}>
+                        <p style={{ color: "#9ca3af" }}>Nouveau mot de passe (à communiquer à l&apos;utilisateur) :</p>
+                        <p className="font-mono font-bold text-base" style={{ color: "#f2f2f5" }}>{resetPw[u.id]}</p>
+                        <p style={{ color: "#4a4a4a" }}>L&apos;utilisateur devra le changer à la prochaine connexion.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {filteredUsers.length === 0 && <p className="py-8 text-center text-sm" style={{ color: "#3a3a3a" }}>Aucun utilisateur.</p>}
         </div>
       )}
 

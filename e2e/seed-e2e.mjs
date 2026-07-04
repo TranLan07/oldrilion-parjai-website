@@ -30,7 +30,28 @@ async function main() {
     },
   });
 
-  console.log("E2E seed OK : e2e_webmaster / e2etest123 (Parjai, perm 10, mandalorien)");
+  // Utilisateur jetable, sans-clan : cible des actions destructives des tests
+  // (reset de mot de passe, etc.) sans impacter e2e_webmaster utilisé pour se connecter.
+  await prisma.user.upsert({
+    where: { username: "e2e_target" },
+    update: { clanId: null, permissionLevel: 1 },
+    create: {
+      publicId: "E2ETGT",
+      username: "e2e_target",
+      passwordHash: hash,
+      displayName: "E2E Target",
+      hubRole: "member",
+      role: "membre",
+      clanId: null,
+      grade: "Recrue",
+      specialization: "",
+      permissionLevel: 1,
+      mustChangePassword: false,
+      mandalorien: false,
+    },
+  });
+
+  console.log("E2E seed OK : e2e_webmaster / e2etest123 (Parjai, perm 10) + e2e_target (jetable)");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());
