@@ -24,6 +24,10 @@ export default async function ClanLayout({ children, params }: Props) {
   if (!clan) notFound();
   const diplomacyPublic = !clan.pagePerms[0] || clan.pagePerms[0].minPermission <= 1;
 
+  // Personnalisation premium : couleur de texte et de fond des cartes.
+  // Les clans non-premium retombent sur les valeurs par défaut du thème.
+  const textVar = clan.premium ? `--clan-text: ${clan.colorText};` : "";
+  const cardVar = clan.premium ? `--clan-card: ${clan.colorCard};` : "";
   const themeVars = `
     :root {
       --clan-bg: ${clan.colorBg};
@@ -31,6 +35,8 @@ export default async function ClanLayout({ children, params }: Props) {
       --clan-accent: ${clan.colorAccent};
       --accent: ${clan.colorPrimary};
       --accent-dim: ${clan.colorAccent};
+      ${textVar}
+      ${cardVar}
     }
   `;
 
@@ -71,8 +77,8 @@ export default async function ClanLayout({ children, params }: Props) {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: themeVars }} />
-      <ClanNavbar slug={clan.slug} clanName={clan.name} diplomacyPublic={diplomacyPublic} />
-      <main className="flex-1">{children}</main>
+      <ClanNavbar slug={clan.slug} clanName={clan.name} diplomacyPublic={diplomacyPublic} premium={clan.premium} />
+      <main className="flex-1" style={{ background: "var(--clan-bg)", color: "var(--clan-text, inherit)" }}>{children}</main>
       <Footer />
     </>
   );

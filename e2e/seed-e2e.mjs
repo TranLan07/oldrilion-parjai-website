@@ -9,6 +9,9 @@ async function main() {
   const parjai = await prisma.clan.findUnique({ where: { slug: "parjai" } });
   if (!parjai) throw new Error("Clan parjai introuvable — lancer `npx tsx prisma/seed.ts` d'abord.");
 
+  // Parjai premium pour tester marketplace clan + personnalisation premium en E2E
+  await prisma.clan.update({ where: { id: parjai.id }, data: { premium: true } });
+
   const hash = hashSync("e2etest123", 10);
 
   await prisma.user.upsert({

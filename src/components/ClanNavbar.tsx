@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
+import { useDebug } from "./DebugContext";
 
-type Props = { slug: string; clanName: string; diplomacyPublic?: boolean };
+type Props = { slug: string; clanName: string; diplomacyPublic?: boolean; premium?: boolean };
 
 const linkStyle = "block px-3 py-2 text-sm font-semibold uppercase tracking-[0.14em] transition-colors";
 
-export default function ClanNavbar({ slug, clanName, diplomacyPublic }: Props) {
+export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }: Props) {
   const base = `/clan/${slug}`;
   const pathname = usePathname();
   const { data: session } = useSession();
@@ -18,14 +19,20 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic }: Props) {
   const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
   const [open, setOpen] = useState(false);
   const [appOpen, setAppOpen] = useState(false);
+  const dbg = useDebug();
 
   useEffect(() => { setOpen(false); setAppOpen(false); }, [pathname]);
 
-  const effectivePerm = session
+  const realEffectivePerm = session
     ? (sessionClanSlug === slug ? (perm ?? 1) : 1)
     : 0;
+  // Mode debug : simule le niveau d'accès pour prévisualiser la navigation.
+  const debugPerm = dbg?.enabled && dbg.perm !== null ? dbg.perm : null;
+  const effectivePerm = debugPerm ?? realEffectivePerm;
 
-  const isAdmin = hubRole === "admin" || (sessionClanSlug === slug && (perm ?? 0) >= 10);
+  const isAdmin = debugPerm !== null
+    ? debugPerm >= 10
+    : (hubRole === "admin" || (sessionClanSlug === slug && (perm ?? 0) >= 10));
 
   // Liens toujours visibles (statiques / partagés en lien externe)
   const publicLinks = [
@@ -43,6 +50,7 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic }: Props) {
     { href: `${base}/missions`, label: "Missions", minPerm: 1 },
     { href: `${base}/evenements`, label: "Événements", minPerm: 1 },
     { href: `${base}/banque`, label: "Banque", minPerm: 1 },
+    ...(premium ? [{ href: `${base}/marketplace`, label: "Marketplace", minPerm: 1 }] : []),
     ...(!diplomacyPublic ? [{ href: `${base}/diplomatie`, label: "Diplomatie", minPerm: 1 }] : []),
   ];
 
@@ -120,7 +128,7 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic }: Props) {
 
           <li className="ml-2">
             {session ? (
-              <Link href="/profil" className="relative flex items-center justify-center rounded-full transition-all"
+              <Link href={`${base}/profil`} className="relative flex items-center justify-center rounded-full transition-all"
                 style={{ width: "34px", height: "34px", background: "#1a1a1a", border: "1px solid var(--beskar-600)", color: "var(--beskar-300)" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--clan-primary, #c9a84c)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--clan-primary, #c9a84c)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--beskar-600)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--beskar-300)"; }}
@@ -167,7 +175,7 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic }: Props) {
           )}
           <div className="mt-3">
             {session ? (
-              <Link href="/profil"
+              <Link href={`${base}/profil`}
                 className="block w-full rounded-sm border px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em]"
                 style={{ fontFamily: "var(--font-display)", borderColor: "var(--beskar-500)", color: "var(--beskar-300)" }}
               >Mon profil</Link>

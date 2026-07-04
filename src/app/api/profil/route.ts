@@ -11,14 +11,21 @@ export async function GET() {
     select: {
       id: true, displayName: true, username: true,
       publicId: true, hubRole: true, anonymous: true,
-      role: true, grade: true, specialization: true,
-      permissionLevel: true,
-      clan: { select: { id: true, slug: true, name: true, colorPrimary: true } },
+      role: true, grade: true, specialization: true, publicSpecialization: true,
+      permissionLevel: true, mandalorien: true,
+      specializationRef: { select: { secret: true, color: true } },
+      clan: { select: { id: true, slug: true, name: true, colorBg: true, colorPrimary: true, colorAccent: true } },
     },
   });
 
   if (!user) return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
-  return NextResponse.json(user);
+
+  const { specializationRef, ...rest } = user;
+  return NextResponse.json({
+    ...rest,
+    specializationSecret: specializationRef?.secret ?? false,
+    specializationColor: specializationRef?.color ?? null,
+  });
 }
 
 export async function PUT(req: NextRequest) {

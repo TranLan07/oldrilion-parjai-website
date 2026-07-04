@@ -12,7 +12,7 @@ type Mission = { id: string; title: string; description: string; status: string;
 type PagePerm = { id: string; path: string; label: string; minPermission: number };
 type ContentSection = { id: string; order: number; title: string; description: string };
 type Grade = { id: string; name: string; defaultPermission: number; order: number; _count: { users: number } };
-type Spec = { id: string; name: string; description: string; defaultPermission: number; secret: boolean; order: number; _count: { users: number } };
+type Spec = { id: string; name: string; description: string; defaultPermission: number; secret: boolean; color: string | null; order: number; _count: { users: number } };
 
 type Tab = "users" | "recruitment" | "channels" | "missions" | "evenements" | "pages" | "lore" | "rules" | "grades" | "specs" | "tags" | "whitelist" | "theme" | "settings";
 
@@ -124,7 +124,7 @@ export default function AdminPage() {
       {tab === "missions" && <MissionsTab missions={missions} premium={clanPremium} api={api} />}
       {tab === "evenements" && <EvenementsTab slug={slug} />}
       {tab === "whitelist" && <WhitelistTab slug={slug} />}
-      {tab === "theme" && <ThemeTab slug={slug} />}
+      {tab === "theme" && <ThemeTab slug={slug} premium={clanPremium} />}
       {tab === "settings" && <SettingsTab slug={slug} />}
       {tab === "lore" && <ContentTab sections={loreSections} endpoint={`/api/clan/${slug}/admin/lore`} label="Lore" api={api} />}
       {tab === "rules" && <ContentTab sections={ruleSections} endpoint={`/api/clan/${slug}/admin/rules`} label="Règle" api={api} />}
@@ -756,14 +756,14 @@ function PagesTab({ pages, api }: { pages: PagePerm[]; api: (e: string, m: strin
 // ── Specializations ──
 function SpecsTab({ specs, premium, api }: { specs: Spec[]; premium: boolean; api: (e: string, m: string, b?: object) => Promise<void> }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", defaultPermission: 1, secret: false, order: 0 });
+  const [form, setForm] = useState({ name: "", description: "", defaultPermission: 1, secret: false, color: "#c9a84c", order: 0 });
   const [editing, setEditing] = useState<Spec | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   async function create() {
     if (!form.name) return;
-    await api("/api/clan/${slug}/admin/specializations", "POST", form);
-    setForm({ name: "", description: "", defaultPermission: 1, secret: false, order: 0 });
+    await api("/api/clan/${slug}/admin/specializations", "POST", { ...form, color: premium ? form.color : null });
+    setForm({ name: "", description: "", defaultPermission: 1, secret: false, color: "#c9a84c", order: 0 });
     setShowForm(false);
   }
 
@@ -783,6 +783,14 @@ function SpecsTab({ specs, premium, api }: { specs: Spec[]; premium: boolean; ap
             <div className="flex items-end"><label className="flex items-center gap-2 text-sm text-foreground/60 cursor-pointer pb-2">
               <input type="checkbox" checked={form.secret} onChange={e => setForm({ ...form, secret: e.target.checked })} disabled={!premium} className="accent-purple-500" /> Spé secrète {!premium && <span style={{ color: "#c9a84c" }}>★</span>}
             </label></div>
+            <div>
+              <label className="mb-1 block text-xs text-foreground/50">Couleur {!premium && <span style={{ color: "#c9a84c" }}>★ premium</span>}</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.color} disabled={!premium} onChange={e => setForm({ ...form, color: e.target.value })}
+                  className="h-9 w-14 cursor-pointer rounded border border-accent-dim/30 bg-background p-0.5 disabled:opacity-40" />
+                <input value={form.color} disabled={!premium} onChange={e => setForm({ ...form, color: e.target.value })} className={`w-24 font-mono ${inp} disabled:opacity-40`} maxLength={7} />
+              </div>
+            </div>
           </div>
           <div><label className="mb-1 block text-xs text-foreground/50">Description</label>
             <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3} className={`resize-none ${inp}`} placeholder="Description visible sur le site (sauf si secrète)" />
@@ -815,6 +823,16 @@ function SpecsTab({ specs, premium, api }: { specs: Spec[]; premium: boolean; ap
                 </div>
               </div>
               <textarea value={editing.description} onChange={e => setEditing({ ...editing, description: e.target.value })} rows={3} className={`resize-none w-full ${inp}`} />
+              {premium && (
+                <div>
+                  <label className="mb-1 block text-xs text-foreground/50">Couleur</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={editing.color ?? "#c9a84c"} onChange={e => setEditing({ ...editing, color: e.target.value })}
+                      className="h-9 w-14 cursor-pointer rounded border border-accent-dim/30 bg-background p-0.5" />
+                    <input value={editing.color ?? ""} onChange={e => setEditing({ ...editing, color: e.target.value })} className={`w-24 font-mono ${inp}`} placeholder="#c9a84c" maxLength={7} />
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button onClick={async () => { await api("/api/clan/${slug}/admin/specializations", "PUT", editing); setEditing(null); }} className={btnGreen}>Sauvegarder</button>
                 <button onClick={() => setEditing(null)} className={btnSecondary}>Annuler</button>
@@ -832,7 +850,8 @@ function SpecsTab({ specs, premium, api }: { specs: Spec[]; premium: boolean; ap
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold" style={{ fontFamily: "var(--font-display)", color: s.secret ? "#a259e0" : "var(--gold-500)" }}>{s.name}</span>
+                  {s.color && <span className="h-3 w-3 rounded-full shrink-0" style={{ background: s.color, boxShadow: `0 0 6px ${s.color}80` }} />}
+                  <span className="font-semibold" style={{ fontFamily: "var(--font-display)", color: s.color ?? (s.secret ? "#a259e0" : "var(--gold-500)") }}>{s.name}</span>
                   {s.secret && <span className="rounded-full bg-purple-900/30 px-2 py-0.5 text-xs text-purple-400">Secrète</span>}
                   <span className="text-xs" style={{ color: "var(--beskar-400)" }}>Perm: {s.defaultPermission} • {s._count.users} membre(s)</span>
                 </div>
@@ -1071,15 +1090,16 @@ function WhitelistTab({ slug }: { slug: string }) {
 }
 
 // -- ThemeTab --
-function ThemeTab({ slug }: { slug: string }) {
-  const [colors, setColors] = useState({ colorBg: "#000000", colorPrimary: "#c9a84c", colorAccent: "#c0392b" });
+function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
+  const [colors, setColors] = useState({ colorBg: "#000000", colorPrimary: "#c9a84c", colorAccent: "#c0392b", colorText: "#e8e6e3", colorCard: "#0d0d0d" });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => {
-      if (d) setColors({ colorBg: d.colorBg, colorPrimary: d.colorPrimary, colorAccent: d.colorAccent });
+      if (d) setColors({ colorBg: d.colorBg, colorPrimary: d.colorPrimary, colorAccent: d.colorAccent, colorText: d.colorText ?? "#e8e6e3", colorCard: d.colorCard ?? "#0d0d0d" });
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function save() {
@@ -1090,34 +1110,62 @@ function ThemeTab({ slug }: { slug: string }) {
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   }
 
-  const colorFields = [
-    { key: "colorBg" as const, label: "Fond" },
-    { key: "colorPrimary" as const, label: "Primaire (titres, accents)" },
-    { key: "colorAccent" as const, label: "Accent (degrade, badges)" },
+  const baseFields = [
+    { field: "colorBg" as const, label: "Fond du clan", hint: "Arrière-plan des pages" },
+    { field: "colorPrimary" as const, label: "Primaire", hint: "Titres, accents, liens" },
+    { field: "colorAccent" as const, label: "Accent", hint: "Dégradés, badges" },
+  ];
+  const premiumFields = [
+    { field: "colorText" as const, label: "Texte", hint: "Couleur de texte custom" },
+    { field: "colorCard" as const, label: "Cartes", hint: "Fond des cartes / panneaux" },
   ];
 
-  return (
-    <div className="space-y-6 max-w-sm">
-      <p className="text-sm text-foreground/50">Personnalisez les couleurs de votre espace clan.</p>
-      {colorFields.map(({ key, label }) => (
-        <div key={key}>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-foreground/50">{label}</label>
-          <div className="flex items-center gap-3">
-            <input type="color" value={colors[key]} onChange={e => setColors(c => ({ ...c, [key]: e.target.value }))}
-              className="h-10 w-16 cursor-pointer rounded border border-accent-dim/30 bg-background p-0.5" />
-            <input value={colors[key]} onChange={e => setColors(c => ({ ...c, [key]: e.target.value }))}
-              className={inp + " w-28 font-mono"} placeholder="#000000" maxLength={7} />
-            <div className="h-8 w-8 rounded border border-accent-dim/30" style={{ background: colors[key] }} />
-          </div>
+  function Picker({ field, label, hint }: { field: keyof typeof colors; label: string; hint: string }) {
+    return (
+      <div>
+        <label className="block text-xs font-semibold uppercase tracking-wider text-foreground/50">{label}</label>
+        <p className="mb-2 text-[10px] text-foreground/30">{hint}</p>
+        <div className="flex items-center gap-3">
+          <input type="color" value={colors[field]} onChange={e => setColors(c => ({ ...c, [field]: e.target.value }))}
+            className="h-10 w-16 cursor-pointer rounded border border-accent-dim/30 bg-background p-0.5" />
+          <input value={colors[field]} onChange={e => setColors(c => ({ ...c, [field]: e.target.value }))}
+            className={inp + " w-28 font-mono"} placeholder="#000000" maxLength={7} />
+          <div className="h-8 w-8 rounded border border-accent-dim/30" style={{ background: colors[field] }} />
         </div>
-      ))}
-      <div className="rounded border border-accent-dim/20 bg-surface p-4">
-        <p className="mb-2 text-xs text-foreground/50 uppercase tracking-wider">Apercu</p>
-        <div className="h-2 rounded mb-2" style={{ background: `linear-gradient(90deg, ${colors.colorAccent}, ${colors.colorPrimary})` }} />
-        <p className="font-bold uppercase tracking-wider" style={{ fontFamily: "var(--font-display)", color: colors.colorPrimary }}>Nom du clan</p>
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-md">
+      <p className="text-sm text-foreground/50">Personnalisez la direction artistique de votre espace clan.</p>
+      <div className="space-y-5">
+        {baseFields.map(f => <Picker key={f.field} {...f} />)}
+      </div>
+
+      <div className="rounded border border-accent-dim/20 p-4 space-y-5" style={{ background: "rgba(201,168,76,0.04)" }}>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#c9a84c" }}>★ Personnalisation premium</span>
+        </div>
+        {premium ? (
+          premiumFields.map(f => <Picker key={f.field} {...f} />)
+        ) : (
+          <p className="text-xs text-foreground/40">Couleur de texte et de cartes personnalisées — réservé aux clans premium. Les couleurs des spécialisations se règlent dans l&apos;onglet Spécialisations.</p>
+        )}
+      </div>
+
+      {/* Aperçu */}
+      <div className="rounded border border-accent-dim/20 p-4" style={{ background: colors.colorBg }}>
+        <p className="mb-2 text-xs uppercase tracking-wider" style={{ color: colors.colorPrimary, opacity: 0.6 }}>Aperçu</p>
+        <div className="h-2 rounded mb-3" style={{ background: `linear-gradient(90deg, ${colors.colorAccent}, ${colors.colorPrimary})` }} />
+        <p className="font-bold uppercase tracking-wider mb-2" style={{ fontFamily: "var(--font-display)", color: colors.colorPrimary }}>Nom du clan</p>
+        <div className="rounded-sm p-3" style={{ background: premium ? colors.colorCard : "#0d0d0d", border: `1px solid ${colors.colorPrimary}30` }}>
+          <p className="text-sm" style={{ color: premium ? colors.colorText : "#e8e6e3" }}>Exemple de texte dans une carte du clan.</p>
+        </div>
+      </div>
+
       <button onClick={save} disabled={saving} className={btnPrimary + " disabled:opacity-50"}>
-        {saving ? "Sauvegarde..." : saved ? "Sauvegarde !" : "Appliquer"}
+        {saving ? "Sauvegarde..." : saved ? "Sauvegardé !" : "Appliquer"}
       </button>
     </div>
   );

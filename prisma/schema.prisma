@@ -17,6 +17,8 @@ model Clan {
   colorBg      String   @default("#000000")
   colorPrimary String   @default("#c9a84c")
   colorAccent  String   @default("#c0392b")
+  colorText    String   @default("#e8e6e3")  // couleur de texte custom (premium)
+  colorCard    String   @default("#0d0d0d")  // couleur de fond des cartes (premium)
   createdAt    DateTime @default(now())
 
   members       User[]
