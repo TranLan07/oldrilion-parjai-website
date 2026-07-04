@@ -105,12 +105,6 @@ export default function MessageriePage() {
     }
   }, [isAdmin, allUsers.length, slug]);
 
-  useEffect(() => {
-    const footer = document.querySelector("footer") as HTMLElement | null;
-    if (footer) footer.style.display = "none";
-    return () => { if (footer) footer.style.display = ""; };
-  }, []);
-
   const active = channels.find((c) => c.id === activeId);
 
   async function sendMessage(e: React.FormEvent) {
@@ -189,6 +183,8 @@ export default function MessageriePage() {
 
   return (
     <div className="flex overflow-hidden" style={{ height: "calc(100dvh - 61px)" }}>
+      {/* Masque le footer dès le premier paint (SSR) — évite le flash de mise en page */}
+      <style dangerouslySetInnerHTML={{ __html: "footer{display:none!important}" }} />
       {/* Sidebar canaux */}
       <aside className={`${activeId ? "hidden md:flex" : "flex"} w-full md:w-60 shrink-0 flex-col border-r`}
         style={{ borderColor: "var(--beskar-700)", background: "var(--beskar-900)" }}>

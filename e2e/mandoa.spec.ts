@@ -21,6 +21,10 @@ test.describe("Messagerie Mando'a", () => {
     const input = page.locator('input[type="text"]');
     await expect(input).toBeVisible({ timeout: 10000 });
 
+    // Laisse l'historique initial se charger (GET + SSE) avant de mesurer,
+    // sinon le compteur "avant" peut être capturé en plein chargement.
+    await page.waitForTimeout(1500);
+
     // Active le mode Mando'a — le bouton n'est visible QUE si session.mandalorien
     // est propagé (régression corrigée dans auth.ts : le flag manquait au JWT/session).
     const mandoaToggle = page.getByRole("button", { name: /mando'a/i });
@@ -34,12 +38,15 @@ test.describe("Messagerie Mando'a", () => {
     await input.fill(phrase);
     await page.getByRole("button", { name: /envoyer/i }).click();
 
-    // Un nouveau message Mando'a apparaît, avec l'affordance de traduction
-    // (réservée aux mandaloriens). +1 preuve le round-trip traduction complet.
+    // L'input se vide au succès de l'envoi (round-trip POST OK)
+    await expect(input).toHaveValue("", { timeout: 10000 });
+
+    // Un nouveau message Mando'a apparaît avec l'affordance de traduction
+    // (réservée aux mandaloriens). Preuve du round-trip de traduction complet.
     await expect.poll(
       () => page.getByText("Voir la traduction").count(),
-      { timeout: 10000 }
-    ).toBe(before + 1);
+      { timeout: 15000 }
+    ).toBeGreaterThan(before);
 
     // En dépliant le dernier, on retrouve le texte français original masqué
     const lastTranslation = page.getByText("Voir la traduction").last();

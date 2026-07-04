@@ -87,12 +87,6 @@ export default function HubMessageriePage() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  useEffect(() => {
-    const footer = document.querySelector("footer") as HTMLElement | null;
-    if (footer) footer.style.display = "none";
-    return () => { if (footer) footer.style.display = ""; };
-  }, []);
-
   const active = channels.find(c => c.id === activeId);
 
   const filteredChannels = channels.filter(c => {
@@ -151,6 +145,8 @@ export default function HubMessageriePage() {
 
   return (
     <div className="flex overflow-hidden" style={{ height: "calc(100dvh - 61px)" }}>
+      {/* Masque le footer dès le premier paint (SSR) — évite le flash de mise en page */}
+      <style dangerouslySetInnerHTML={{ __html: "footer{display:none!important}" }} />
       {/* Sidebar */}
       <aside className={`${activeId ? "hidden md:flex" : "flex"} w-full md:w-64 shrink-0 flex-col border-r`}
         style={{ borderColor: "#1a1a1a", background: "#080808" }}>

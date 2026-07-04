@@ -47,9 +47,9 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic }: Props) {
   ];
 
   // Liens hors dropdown (points d'entrée externes + admin)
+  // Le traducteur Mando'a est volontairement absent des clans : il n'existe que dans le hub.
   const extraLinks = [
     ...(session ? [{ href: `${base}/recrutement`, label: "Recrutement" }] : []),
-    { href: `${base}/traducteur`, label: "Traducteur" },
   ];
 
   const visibleApp = effectivePerm > 0

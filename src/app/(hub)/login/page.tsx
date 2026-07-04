@@ -30,7 +30,7 @@ export default function LoginPage() {
     if (result?.error) {
       setError("Identifiants incorrects");
     } else {
-      router.push("/admin");
+      router.push("/");
       router.refresh();
     }
   }
