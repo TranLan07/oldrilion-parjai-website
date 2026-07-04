@@ -198,12 +198,12 @@ export default function HubAdminPage() {
     <div className="mx-auto max-w-[1200px] px-6 py-12">
       <h1 className="mb-2 text-4xl font-bold uppercase tracking-[0.14em]"
         style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>Admin Hub</h1>
-      <p className="mb-8 text-sm" style={{ color: "#4a4a4a" }}>Panneau d'administration global du réseau.</p>
+      <p className="mb-8 text-sm" style={{ color: "#4a4a4a" }}>Panneau d&apos;administration global du réseau.</p>
 
       {msg && <div className="mb-6 rounded-sm border px-4 py-3 text-sm" style={{ borderColor: "#2a2a2a", background: "#111", color: "#9ca3af" }}>{msg}</div>}
 
       {/* Tabs */}
-      <div className="mb-8 flex gap-1 border-b" style={{ borderColor: "#1a1a1a" }}>
+      <div className="mb-8 flex gap-1 overflow-x-auto border-b" style={{ borderColor: "#1a1a1a" }}>
         {tabs.map(t => (
           <button key={t} onClick={() => setTab(t)}
             className="px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.1em] transition-colors"
@@ -479,7 +479,7 @@ export default function HubAdminPage() {
       {tab === "Missions" && (
         <div className="space-y-6">
           <p className="text-sm" style={{ color: "#6b7280" }}>
-            Missions globales du hub + missions de clans marquées "global". Vous pouvez retirer une mission de clan du hub ou supprimer les missions hub.
+            Missions globales du hub + missions de clans marquées &quot;global&quot;. Vous pouvez retirer une mission de clan du hub ou supprimer les missions hub.
           </p>
           {/* Créer une mission hub */}
           <div className="rounded-sm border p-4 space-y-3" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
@@ -562,7 +562,7 @@ export default function HubAdminPage() {
       {tab === "Événements" && (
         <div className="space-y-6">
           <p className="text-sm" style={{ color: "#6b7280" }}>
-            Événements proposés par les clans (en attente d'approbation) et événements hub. Approuvez, rejetez ou créez des événements visibles par tous.
+            Événements proposés par les clans (en attente d&apos;approbation) et événements hub. Approuvez, rejetez ou créez des événements visibles par tous.
           </p>
 
           {/* Événements en attente */}

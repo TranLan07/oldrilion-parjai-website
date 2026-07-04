@@ -11,9 +11,10 @@ export async function POST(_: NextRequest, { params }: P) {
   const { id } = await params;
   const listing = await prisma.marketplaceListing.findUnique({
     where: { id },
-    include: { seller: { select: { id: true, displayName: true } } },
+    include: { seller: { select: { id: true, displayName: true, publicId: true } } },
   });
   if (!listing) return NextResponse.json({ error: "Introuvable" }, { status: 404 });
+  if (listing.status !== "active") return NextResponse.json({ error: "Annonce inactive" }, { status: 400 });
   if (listing.sellerId === session.user.id) return NextResponse.json({ error: "Vous êtes le vendeur" }, { status: 400 });
 
   const buyerId = session.user.id;
@@ -27,10 +28,12 @@ export async function POST(_: NextRequest, { params }: P) {
 
   if (!channel) {
     const buyer = await prisma.user.findUnique({ where: { id: buyerId }, select: { displayName: true } });
+    // Annonce anonyme : ne pas révéler le nom du vendeur dans le nom du canal
+    const sellerLabel = listing.anonymous ? `Anonyme [${listing.seller.publicId}]` : listing.seller.displayName;
     channel = await prisma.channel.create({
       data: {
         clanId: null, isPrivate: true, accessUsers,
-        name: `MP: ${buyer?.displayName} ↔ ${listing.seller.displayName}`,
+        name: `MP: ${buyer?.displayName} ↔ ${sellerLabel}`,
         description: `Canal privé créé depuis le Marketplace`,
       },
     });

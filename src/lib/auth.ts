@@ -47,6 +47,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.permissionLevel = dbUser.permissionLevel;
           token.mustChangePassword = dbUser.mustChangePassword;
           token.anonymous = dbUser.anonymous;
+          token.mandalorien = dbUser.mandalorien;
         }
       }
       return token;
@@ -65,6 +66,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         s.permissionLevel = token.permissionLevel;
         s.mustChangePassword = token.mustChangePassword;
         s.anonymous = token.anonymous;
+        s.mandalorien = token.mandalorien;
       }
       return session;
     },

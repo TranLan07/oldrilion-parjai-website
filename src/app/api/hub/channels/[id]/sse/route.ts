@@ -15,12 +15,29 @@ export async function GET(_req: NextRequest, { params }: P) {
   const channel = await prisma.channel.findUnique({ where: { id, clanId: null } });
   if (!channel) return new Response("Canal introuvable", { status: 404 });
 
+  const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { clanId: true, mandalorien: true } });
+
   if (channel.isPrivate) {
-    const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { clanId: true } });
+    const accessUsers: string[] = JSON.parse(channel.accessUsers || "[]");
     const accessClans: string[] = JSON.parse(channel.accessClans || "[]");
-    if (!userRecord?.clanId || !accessClans.includes(userRecord.clanId)) {
-      return new Response("Accès refusé", { status: 403 });
-    }
+    const allowed = accessUsers.includes(session.user.id)
+      || (!!userRecord?.clanId && accessClans.includes(userRecord.clanId));
+    if (!allowed) return new Response("Accès refusé", { status: 403 });
+  }
+
+  const isMandalorien = userRecord?.mandalorien ?? false;
+
+  // Masque la traduction Mando'a pour les abonnés non-mandaloriens
+  function sanitize(data: string): string {
+    if (isMandalorien) return data;
+    try {
+      const payload = JSON.parse(data);
+      if (payload?.type === "message" && payload.message?.mandoa && payload.message.originalContent) {
+        payload.message.originalContent = null;
+        return JSON.stringify(payload);
+      }
+    } catch { /* payload non-JSON : transmis tel quel */ }
+    return data;
   }
 
   const encoder = new TextEncoder();
@@ -37,7 +54,7 @@ export async function GET(_req: NextRequest, { params }: P) {
 
       unsubscribe = subscribe(id, (data: string) => {
         if (closed) return;
-        try { controller.enqueue(encoder.encode(`data: ${data}\n\n`)); }
+        try { controller.enqueue(encoder.encode(`data: ${sanitize(data)}\n\n`)); }
         catch { closed = true; }
       });
 

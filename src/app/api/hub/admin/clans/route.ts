@@ -117,6 +117,10 @@ export async function DELETE(req: NextRequest) {
       });
     }
 
+    // Annonces marketplace du clan : suppression explicite
+    // (relation optionnelle → la suppression du clan les transformerait en annonces "joueur" sans expiration)
+    await tx.marketplaceListing.deleteMany({ where: { clanId: id } });
+
     // Supprimer le clan (cascade : grades, specs, canaux, missions, etc.)
     await tx.clan.delete({ where: { id } });
   });

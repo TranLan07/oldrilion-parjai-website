@@ -16,13 +16,13 @@ export default function Footer() {
           </div>
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-xs">
             <Link href="/clans" style={{ color: "#6b7280" }}>Clans</Link>
-            <Link href="/traducteur" style={{ color: "#6b7280" }}>Mando'a</Link>
+            <Link href="/traducteur" style={{ color: "#6b7280" }}>Mando&apos;a</Link>
             <Link href="/contact" style={{ color: "#6b7280" }}>Contact &amp; RGPD</Link>
           </div>
         </div>
         <div className="mt-8 border-t pt-6 text-center" style={{ borderColor: "#1a1a1a" }}>
           <p className="text-xs" style={{ color: "#2a2a2a" }}>
-            Site fictif dans le cadre d'un serveur RP Star Wars · Aucune donnée commerciale
+            Site fictif dans le cadre d&apos;un serveur RP Star Wars · Aucune donnée commerciale
           </p>
         </div>
       </div>

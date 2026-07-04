@@ -14,13 +14,16 @@ export async function GET(_req: NextRequest, { params }: P) {
   const channel = await prisma.channel.findUnique({ where: { id, clanId: null } });
   if (!channel) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
 
-  // Vérification d'accès aux canaux privés
+  // Vérification d'accès aux canaux privés (par clan ou par utilisateur)
   if (channel.isPrivate) {
-    const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { clanId: true } });
-    const accessClans: string[] = JSON.parse(channel.accessClans || "[]");
-    if (!userRecord?.clanId || !accessClans.includes(userRecord.clanId)) {
-      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    const accessUsers: string[] = JSON.parse(channel.accessUsers || "[]");
+    let allowed = accessUsers.includes(session.user.id);
+    if (!allowed) {
+      const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { clanId: true } });
+      const accessClans: string[] = JSON.parse(channel.accessClans || "[]");
+      allowed = !!userRecord?.clanId && accessClans.includes(userRecord.clanId);
     }
+    if (!allowed) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
   // Auto-join si pas encore membre
@@ -54,11 +57,14 @@ export async function POST(req: NextRequest, { params }: P) {
   if (!channel) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
 
   if (channel.isPrivate) {
-    const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { clanId: true } });
-    const accessClans: string[] = JSON.parse(channel.accessClans || "[]");
-    if (!userRecord?.clanId || !accessClans.includes(userRecord.clanId)) {
-      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    const accessUsers: string[] = JSON.parse(channel.accessUsers || "[]");
+    let allowed = accessUsers.includes(session.user.id);
+    if (!allowed) {
+      const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { clanId: true } });
+      const accessClans: string[] = JSON.parse(channel.accessClans || "[]");
+      allowed = !!userRecord?.clanId && accessClans.includes(userRecord.clanId);
     }
+    if (!allowed) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
   const membership = await prisma.channelMember.findUnique({

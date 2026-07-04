@@ -30,55 +30,84 @@ export default function MembresPage() {
       )}
 
       {!loading && members.length > 0 && (
-        <div className="overflow-x-auto rounded-sm" style={{ border: "1px solid var(--beskar-600)" }}>
-          <table className="w-full text-left">
-            <thead>
-              <tr style={{ background: "var(--beskar-700)" }}>
-                <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.22em]"
-                  style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #c9a84c)" }}>Nom</th>
-                <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.22em]"
-                  style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #c9a84c)" }}>Grade</th>
-                <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.22em]"
-                  style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #c9a84c)" }}>Spécialisation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => (
-                <tr key={m.id} className="transition-colors"
-                  style={{ background: "var(--beskar-800)", borderBottom: "1px solid var(--beskar-600)" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--beskar-700)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "var(--beskar-800)"; }}
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                        style={{ background: "rgba(139,26,26,0.3)", color: "var(--beskar-100)" }}>
-                        {m.displayName.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="font-medium" style={{ color: "var(--beskar-100)" }}>{m.displayName}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm" style={{ fontFamily: "var(--font-mono)", color: "var(--beskar-200)" }}>
-                      {m.grade}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="rounded-sm px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]"
-                      style={{
-                        fontFamily: "var(--font-display)",
-                        background: "color-mix(in srgb, var(--clan-primary, #c9a84c) 10%, transparent)",
-                        color: "var(--clan-primary, #c9a84c)",
-                        border: "1px solid color-mix(in srgb, var(--clan-primary, #c9a84c) 20%, transparent)",
-                      }}>
-                      {m.specialization}
-                    </span>
-                  </td>
+        <>
+          {/* Cards — mobile */}
+          <div className="space-y-3 md:hidden">
+            {members.map((m) => (
+              <div key={m.id} className="flex items-center gap-4 rounded-sm border px-4 py-3"
+                style={{ borderColor: "var(--beskar-600)", background: "var(--beskar-800)" }}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                  style={{ background: "rgba(139,26,26,0.3)", color: "var(--beskar-100)" }}>
+                  {m.displayName.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate" style={{ color: "var(--beskar-100)" }}>{m.displayName}</p>
+                  <p className="text-xs truncate" style={{ fontFamily: "var(--font-mono)", color: "var(--beskar-400)" }}>{m.grade}</p>
+                </div>
+                <span className="shrink-0 rounded-sm px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]"
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    background: "color-mix(in srgb, var(--clan-primary, #c9a84c) 10%, transparent)",
+                    color: "var(--clan-primary, #c9a84c)",
+                    border: "1px solid color-mix(in srgb, var(--clan-primary, #c9a84c) 20%, transparent)",
+                  }}>
+                  {m.specialization}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Table — md+ */}
+          <div className="hidden overflow-x-auto rounded-sm md:block" style={{ border: "1px solid var(--beskar-600)" }}>
+            <table className="w-full text-left">
+              <thead>
+                <tr style={{ background: "var(--beskar-700)" }}>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.22em]"
+                    style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #c9a84c)" }}>Nom</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.22em]"
+                    style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #c9a84c)" }}>Grade</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.22em]"
+                    style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #c9a84c)" }}>Spécialisation</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {members.map((m) => (
+                  <tr key={m.id} className="transition-colors"
+                    style={{ background: "var(--beskar-800)", borderBottom: "1px solid var(--beskar-600)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--beskar-700)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "var(--beskar-800)"; }}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                          style={{ background: "rgba(139,26,26,0.3)", color: "var(--beskar-100)" }}>
+                          {m.displayName.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-medium" style={{ color: "var(--beskar-100)" }}>{m.displayName}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm" style={{ fontFamily: "var(--font-mono)", color: "var(--beskar-200)" }}>
+                        {m.grade}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="rounded-sm px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]"
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          background: "color-mix(in srgb, var(--clan-primary, #c9a84c) 10%, transparent)",
+                          color: "var(--clan-primary, #c9a84c)",
+                          border: "1px solid color-mix(in srgb, var(--clan-primary, #c9a84c) 20%, transparent)",
+                        }}>
+                        {m.specialization}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       <p className="mt-6 text-xs" style={{ color: "var(--beskar-400)" }}>

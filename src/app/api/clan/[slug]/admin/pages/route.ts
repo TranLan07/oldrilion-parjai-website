@@ -29,6 +29,9 @@ export async function POST(req: NextRequest, { params }: P) {
 export async function PUT(req: NextRequest, { params }: P) {
   const { slug } = await params;
   if (!(await requireClanAdmin(slug))) return denied();
+  const clan = await resolveClan(slug);
+  if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const { id, path, label, minPermission } = await req.json();
   if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
   const page = await prisma.pagePermission.update({ where: { id }, data: { ...(path && { path }), ...(label && { label }), ...(minPermission !== undefined && { minPermission }) } });
@@ -38,6 +41,9 @@ export async function PUT(req: NextRequest, { params }: P) {
 export async function DELETE(req: NextRequest, { params }: P) {
   const { slug } = await params;
   if (!(await requireClanAdmin(slug))) return denied();
+  const clan = await resolveClan(slug);
+  if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const { id } = await req.json();
   await prisma.pagePermission.delete({ where: { id } });
   return NextResponse.json({ success: true });

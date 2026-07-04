@@ -5,7 +5,7 @@ const CONSONANTS = ["b", "c", "d", "g", "k", "m", "n", "r", "s", "t", "v", "sh",
 const VOWELS = ["a", "e", "i", "o", "u", "ar", "ir", "or", "al"];
 const SUFFIXES = ["", "'ir", "'e", "ir", "e", "an", "'al"];
 
-function generateWord(seed: string): string {
+export function generateWord(seed: string): string {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   const c1 = CONSONANTS[hash % CONSONANTS.length];

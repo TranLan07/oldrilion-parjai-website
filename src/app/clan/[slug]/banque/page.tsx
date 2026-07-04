@@ -116,18 +116,23 @@ export default function BanquePage() {
           <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "var(--beskar-400)" }}>Historique</h3>
           <div className="space-y-2">
             {data.transactions.map(tx => (
-              <div key={tx.id} className="flex items-center gap-4 rounded-sm border px-4 py-3"
+              <div key={tx.id} className="rounded-sm border px-4 py-3"
                 style={{ borderColor: "var(--beskar-800)", background: "var(--beskar-900)" }}>
-                <span className="w-6 text-center text-lg">{tx.type === "depot" ? "+" : "−"}</span>
-                <span className="w-28 font-semibold text-sm"
-                  style={{ color: tx.type === "depot" ? "#22c55e" : "#ef4444" }}>
-                  {tx.amount.toLocaleString("fr-FR")} cr.
-                </span>
-                <span className="flex-1 text-sm truncate" style={{ color: "var(--beskar-300)" }}>{tx.label || "—"}</span>
-                <span className="text-xs" style={{ color: "var(--beskar-500)" }}>{tx.author.displayName}</span>
-                <span className="text-xs" style={{ color: "var(--beskar-600)" }}>
-                  {new Date(tx.createdAt).toLocaleDateString("fr-FR")}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="w-5 shrink-0 text-center font-bold"
+                    style={{ color: tx.type === "depot" ? "#22c55e" : "#ef4444" }}>
+                    {tx.type === "depot" ? "+" : "−"}
+                  </span>
+                  <span className="font-semibold text-sm"
+                    style={{ color: tx.type === "depot" ? "#22c55e" : "#ef4444" }}>
+                    {tx.amount.toLocaleString("fr-FR")} cr.
+                  </span>
+                  <span className="flex-1 text-sm truncate" style={{ color: "var(--beskar-300)" }}>{tx.label || "—"}</span>
+                </div>
+                <div className="mt-1 flex gap-3 pl-8 text-xs" style={{ color: "var(--beskar-500)" }}>
+                  <span>{tx.author.displayName}</span>
+                  <span style={{ color: "var(--beskar-600)" }}>{new Date(tx.createdAt).toLocaleDateString("fr-FR")}</span>
+                </div>
               </div>
             ))}
           </div>

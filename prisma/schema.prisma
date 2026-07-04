@@ -226,7 +226,7 @@ model Channel {
   // Accès privé : grade, spec, ou liste d'IDs utilisateur
   accessGrades String @default("[]")  // JSON array of grade names
   accessSpecs  String @default("[]")  // JSON array of spec names
-  accessUsers  String @default("[]")  // JSON array of publicIds
+  accessUsers  String @default("[]")  // JSON array of user ids (canaux privés entre utilisateurs, ex: contact Marketplace)
   accessClans  String @default("[]")  // JSON array of clanIds (hub private channels)
 
   members   ChannelMember[]

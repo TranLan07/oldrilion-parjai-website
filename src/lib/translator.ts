@@ -38,12 +38,20 @@ const elisionMap: Record<string, string[]> = {
 };
 
 function makeLookupFr(dict: Record<string, string>) {
+  // Index secondaire sans accents : permet de trouver "père" en tapant "pere"
+  const accentless: Record<string, string> = {};
+  for (const [k, v] of Object.entries(dict)) {
+    const na = removeAccents(k);
+    if (na !== k && !accentless[na]) accentless[na] = v;
+  }
+
   return (word: string): string | null => {
     const key = normalize(word);
     if (dict[key]) return dict[key];
 
     const noAccent = removeAccents(key);
-    if (noAccent !== key && dict[noAccent]) return dict[noAccent];
+    if (dict[noAccent]) return dict[noAccent];
+    if (accentless[noAccent]) return accentless[noAccent];
 
     // NLP lemmatization: try all lemmas (infinitive forms) from the 7800+ verb database
     for (const lemma of getLemmas(key)) {
@@ -141,18 +149,22 @@ export function translate(
     let matched = false;
 
     if (dir === "fr-to-mandoa") {
-      // Try multi-word matches (4, 3, 2 words)
-      for (let len = 4; len >= 2; len--) {
-        if (i + len > tokens.length) continue;
-        const slice = tokens.slice(i, i + len);
-        // Skip slices that are only whitespace
-        const phrase = slice.filter(s => !/^[\s.,;:!?]+$/.test(s)).join(" ");
-        const phraseNorm = normalize(phrase);
+      // Expressions multi-mots (4 → 2 mots) : on ne compte que les mots — les
+      // espaces sont ignorés et la ponctuation est une frontière infranchissable.
+      const wordIdx: number[] = [];
+      for (let j = i; j < tokens.length && wordIdx.length < 4; j++) {
+        if (/^\s+$/.test(tokens[j])) continue;
+        if (/^[.,;:!?]+$/.test(tokens[j])) break;
+        wordIdx.push(j);
+      }
+      for (let n = Math.min(4, wordIdx.length); n >= 2; n--) {
+        const phraseNorm = normalize(wordIdx.slice(0, n).map(j => tokens[j]).join(" "));
         if (phraseNorm && frDict[phraseNorm]) {
-          words.push({ original: slice.join(""), translated: frDict[phraseNorm], found: true });
+          const endIdx = wordIdx[n - 1];
+          words.push({ original: tokens.slice(i, endIdx + 1).join(""), translated: frDict[phraseNorm], found: true });
           outputParts.push(frDict[phraseNorm]);
           matched = true;
-          i += len;
+          i = endIdx; // le i++ en fin de boucle passe au token suivant
           break;
         }
       }

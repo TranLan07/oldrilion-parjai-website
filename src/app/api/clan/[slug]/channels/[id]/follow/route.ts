@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { randomBytes } from "crypto";
 import { sendMail } from "@/lib/mail";
+import { resolveClan, notFound, suspendedResponse } from "@/lib/clan-auth";
 
 type P = { params: Promise<{ slug: string; id: string }> };
 
@@ -10,13 +11,25 @@ export async function POST(req: NextRequest, { params }: P) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const { id } = await params;
+  const { slug, id } = await params;
   const { email } = await req.json();
   if (!email?.includes("@")) return NextResponse.json({ error: "Email invalide" }, { status: 400 });
 
+  const clan = await resolveClan(slug);
+  if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
+
   const channel = await prisma.channel.findUnique({ where: { id } });
-  if (!channel) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
+  if (!channel || channel.clanId !== clan.id) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
   if (!channel.emailNotifEnabled) return NextResponse.json({ error: "Notifications désactivées sur ce canal" }, { status: 400 });
+
+  // Canal privé : seuls les membres du canal peuvent le suivre par email
+  if (channel.isPrivate) {
+    const member = await prisma.channelMember.findUnique({
+      where: { userId_channelId: { userId: session.user.id, channelId: id } },
+    });
+    if (!member) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  }
 
   const existing = await prisma.channelFollower.findUnique({
     where: { userId_channelId: { userId: session.user.id, channelId: id } },
@@ -50,7 +63,10 @@ export async function POST(req: NextRequest, { params }: P) {
 export async function DELETE(_req: NextRequest, { params }: P) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  const { id } = await params;
+  const { slug, id } = await params;
+  const clan = await resolveClan(slug);
+  if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   await prisma.channelFollower.deleteMany({ where: { userId: session.user.id, channelId: id } });
   return NextResponse.json({ success: true });
 }

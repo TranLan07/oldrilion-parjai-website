@@ -15,7 +15,18 @@ export async function GET() {
     },
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json(listings);
+
+  // Annonce anonyme : ne jamais exposer l'identité du vendeur dans la réponse
+  // (sauf au vendeur lui-même et aux admins hub, qui doivent pouvoir gérer l'annonce)
+  const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
+  const isHubAdmin = hubRole === "admin" || hubRole === "moderator";
+  const sanitized = listings.map(l => {
+    if (l.anonymous && l.sellerId !== session.user!.id && !isHubAdmin) {
+      return { ...l, sellerId: "", seller: { id: "", displayName: "", anonymous: true, publicId: l.seller.publicId } };
+    }
+    return l;
+  });
+  return NextResponse.json(sanitized);
 }
 
 export async function POST(req: NextRequest) {
@@ -32,7 +43,8 @@ export async function POST(req: NextRequest) {
   // Annonce clan : admin clan premium requis
   if (clanId) {
     if (user.clanId !== clanId) return NextResponse.json({ error: "Clan invalide" }, { status: 403 });
-    const clan = await prisma.clan.findUnique({ where: { id: clanId }, select: { premium: true } });
+    const clan = await prisma.clan.findUnique({ where: { id: clanId }, select: { premium: true, suspended: true } });
+    if (clan?.suspended) return NextResponse.json({ error: "Ce clan est suspendu" }, { status: 403 });
     if (!clan?.premium) return NextResponse.json({ error: "Clan non premium" }, { status: 403 });
     // vérif admin clan
     const userFull = await prisma.user.findUnique({ where: { id: session.user.id }, select: { permissionLevel: true } });

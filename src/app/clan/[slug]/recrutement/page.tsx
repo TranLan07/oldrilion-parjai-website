@@ -1,5 +1,4 @@
 "use client";
-"use client";
 
 import { useState } from "react";
 import { useParams } from "next/navigation";
@@ -11,6 +10,7 @@ export default function RecrutementPage() {
   const slug = params.slug as string;
   const { data: session } = useSession();
   const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState({ rpName: "", discord: "", experience: "", motivation: "", specialization: "" });
 
   if (session) {
     return (
@@ -23,7 +23,6 @@ export default function RecrutementPage() {
       </div>
     );
   }
-  const [form, setForm] = useState({ rpName: "", discord: "", experience: "", motivation: "", specialization: "" });
 
   const inputClass = "w-full rounded border border-accent-dim/30 bg-surface px-4 py-3 text-foreground outline-none transition-colors focus:border-accent";
 

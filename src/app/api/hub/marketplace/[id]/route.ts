@@ -10,6 +10,9 @@ export async function PUT(req: NextRequest, { params }: P) {
 
   const { id } = await params;
   const { status } = await req.json();
+  if (!["active", "sold", "cancelled"].includes(status)) {
+    return NextResponse.json({ error: "Statut invalide" }, { status: 400 });
+  }
 
   const listing = await prisma.marketplaceListing.findUnique({ where: { id }, select: { sellerId: true, clanId: true } });
   if (!listing) return NextResponse.json({ error: "Introuvable" }, { status: 404 });

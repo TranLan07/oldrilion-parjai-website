@@ -40,7 +40,7 @@ export default function ContactPage() {
       <h1 className="mb-4 text-4xl font-bold uppercase tracking-[0.14em]"
         style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>Demande reçue</h1>
       <p className="text-sm leading-relaxed" style={{ color: "#6b7280" }}>
-        Votre message a bien été transmis aux administrateurs du Hub. Nous vous répondrons à l'adresse indiquée dans les meilleurs délais.
+        Votre message a bien été transmis aux administrateurs du Hub. Nous vous répondrons à l&apos;adresse indiquée dans les meilleurs délais.
       </p>
     </div>
   );

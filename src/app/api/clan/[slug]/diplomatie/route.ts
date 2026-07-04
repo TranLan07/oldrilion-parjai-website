@@ -18,12 +18,11 @@ export async function GET(_: Request, { params }: P) {
     : null;
   const effectivePerm = userPerm?.clanId === clan.id ? (userPerm?.permissionLevel ?? 0) : 0;
 
-  // Check page permission
+  // Check page permission : minPerm <= 1 → public, sinon réservé aux membres du clan avec le niveau requis
   const pp = await prisma.pagePermission.findUnique({ where: { clanId_path: { clanId: clan.id, path: "diplomatie" } } });
   const minPerm = pp?.minPermission ?? 1;
-  if (effectivePerm < minPerm && minPerm > 1) {
-    if (!session) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-    // Public (minPerm <= 1) → toujours accessible
+  if (minPerm > 1 && effectivePerm < minPerm) {
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
   const entries = await prisma.diplomacyEntry.findMany({

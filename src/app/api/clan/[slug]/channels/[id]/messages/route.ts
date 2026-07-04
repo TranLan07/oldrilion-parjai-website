@@ -4,17 +4,31 @@ import { prisma } from "@/lib/prisma";
 import { notifyChannelFollowers } from "@/lib/notify-followers";
 import { publish } from "@/lib/sse-store";
 import { translateWithAutoGenerate } from "@/lib/mandoa-auto";
+import { resolveClan, notFound, suspendedResponse } from "@/lib/clan-auth";
 
 type P = { params: Promise<{ slug: string; id: string }> };
+
+// Freemium : un clan free n'a accès qu'à son premier canal (les autres sont
+// masqués à la lecture, donc également bloqués à l'écriture — jamais supprimés).
+async function channelMasked(clanId: string, channelId: string, premium: boolean): Promise<boolean> {
+  if (premium) return false;
+  const first = await prisma.channel.findFirst({ where: { clanId }, orderBy: { createdAt: "asc" }, select: { id: true } });
+  return first?.id !== channelId;
+}
 
 export async function GET(_req: NextRequest, { params }: P) {
   try {
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    const { id } = await params;
+    const { slug, id } = await params;
+
+    const clan = await resolveClan(slug);
+    if (!clan) return notFound();
+    if (clan.suspended) return suspendedResponse();
 
     const channel = await prisma.channel.findUnique({ where: { id }, include: { members: true } });
-    if (!channel) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
+    if (!channel || channel.clanId !== clan.id) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
+    if (await channelMasked(clan.id, id, clan.premium)) return NextResponse.json({ error: "Canal réservé aux clans premium" }, { status: 403 });
 
     const isMember = channel.members.some(m => m.userId === session.user!.id);
     if (channel.isPrivate && !isMember) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
@@ -49,10 +63,15 @@ export async function POST(req: NextRequest, { params }: P) {
   try {
     const session = await auth();
     if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-    const { id } = await params;
+    const { slug, id } = await params;
+
+    const clan = await resolveClan(slug);
+    if (!clan) return notFound();
+    if (clan.suspended) return suspendedResponse();
 
     const channel = await prisma.channel.findUnique({ where: { id } });
-    if (!channel) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
+    if (!channel || channel.clanId !== clan.id) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
+    if (await channelMasked(clan.id, id, clan.premium)) return NextResponse.json({ error: "Canal réservé aux clans premium" }, { status: 403 });
 
     const membership = await prisma.channelMember.findUnique({
       where: { userId_channelId: { userId: session.user.id, channelId: id } },
@@ -86,7 +105,8 @@ export async function POST(req: NextRequest, { params }: P) {
       include: { user: { select: { id: true, displayName: true, role: true, grade: true, anonymous: true, publicId: true } } },
     });
 
-    notifyChannelFollowers(id, message.user.displayName, content.trim()).catch(console.error);
+    // finalContent (traduit si Mando'a) — jamais le texte original vers les followers email
+    notifyChannelFollowers(id, message.user.displayName, finalContent).catch(console.error);
     publish(id, { type: "message", message });
     return NextResponse.json(message);
   } catch (e) {

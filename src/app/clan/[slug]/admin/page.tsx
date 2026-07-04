@@ -1,5 +1,4 @@
 "use client";
-"use client";
 
 import { useSession } from "next-auth/react";
 import { useParams } from "next/navigation";
@@ -7,7 +6,7 @@ import { useEffect, useState, useCallback } from "react";
 
 type User = { id: string; username: string; displayName: string; role: string; grade: string; specialization: string; permissionLevel: number };
 type Recruitment = { id: string; rpName: string; discord: string; experience: string; motivation: string; specialization: string; status: string; tempPassword?: string };
-type ChannelMemberAdmin = { muted: boolean; user: { id: string; displayName: true; grade: string; specialization: string } };
+type ChannelMemberAdmin = { muted: boolean; user: { id: string; displayName: string; grade: string; specialization: string } };
 type Channel = { id: string; name: string; description: string; isPrivate: boolean; members: ChannelMemberAdmin[]; _count: { messages: number } };
 type Mission = { id: string; title: string; description: string; status: string; confidentiality: string; maxParticipants: number; visibility: string; members: { user: { id: string; displayName: string } }[] };
 type PagePerm = { id: string; path: string; label: string; minPermission: number };
@@ -908,7 +907,7 @@ function TagsTab({ slug }: { slug: string }) {
             >+ {tag.name}</button>
           ))}
           {allTags.filter(t => !clanTagIds.has(t.id)).length === 0 && (
-            <p className="text-sm" style={{ color: "var(--beskar-500)" }}>Tous les tags sont déjà assignés, ou aucun tag n'existe (créez-en depuis l'Admin Hub).</p>
+            <p className="text-sm" style={{ color: "var(--beskar-500)" }}>Tous les tags sont déjà assignés, ou aucun tag n&apos;existe (créez-en depuis l&apos;Admin Hub).</p>
           )}
         </div>
       </div>

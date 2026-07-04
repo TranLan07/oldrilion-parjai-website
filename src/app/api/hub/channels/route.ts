@@ -16,6 +16,8 @@ export async function GET() {
         { isPrivate: false },
         // Canal privé : le clan de l'utilisateur est dans accessClans
         ...(clanId ? [{ isPrivate: true, accessClans: { contains: clanId } }] : []),
+        // Canal privé entre utilisateurs (ex: contact Marketplace)
+        { isPrivate: true, accessUsers: { contains: session.user.id } },
       ],
     },
     include: {

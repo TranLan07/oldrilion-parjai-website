@@ -77,7 +77,7 @@ export default async function HubHome() {
           </h2>
           <p className="mb-8 text-base" style={{ color: "#6b7280" }}>
             Choisissez un clan, consultez sa page et postulez directement via le formulaire de recrutement.
-            Une fois accepté, vous aurez accès à l'espace privé du clan et aux canaux inter-clans du hub.
+            Une fois accepté, vous aurez accès à l&apos;espace privé du clan et aux canaux inter-clans du hub.
           </p>
           <Link href="/clans"
             className="inline-block rounded-sm border px-8 py-3 text-sm font-semibold uppercase tracking-[0.14em]"

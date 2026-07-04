@@ -193,7 +193,7 @@ export default function ParametresPage() {
         </div>
 
         {settings.channels.length === 0 && (
-          <p className="text-sm" style={{ color: "#3a3a3a" }}>Vous n'êtes membre d'aucun canal pour l'instant.</p>
+          <p className="text-sm" style={{ color: "#3a3a3a" }}>Vous n&apos;êtes membre d&apos;aucun canal pour l&apos;instant.</p>
         )}
 
         {hubChannels.length > 0 && (

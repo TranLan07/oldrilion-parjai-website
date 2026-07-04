@@ -61,7 +61,8 @@ export async function PUT(req: NextRequest, { params }: P) {
       ...(data.title && { title: data.title.trim() }),
       ...(data.description !== undefined && { description: data.description }),
       ...(data.status && { status: data.status }),
-      ...(data.visibility && { visibility: data.visibility }),
+      // Freemium gate : la visibility n'est modifiable que pour les clans premium
+      ...(data.visibility && clan.premium && { visibility: data.visibility }),
       ...(data.specializationId !== undefined && { specializationId: data.specializationId || null }),
       ...(data.maxParticipants !== undefined && { maxParticipants: data.maxParticipants ? Number(data.maxParticipants) : null }),
       ...(data.startAt !== undefined && { startAt: data.startAt ? new Date(data.startAt) : null }),
@@ -76,6 +77,9 @@ export async function PUT(req: NextRequest, { params }: P) {
 export async function DELETE(req: NextRequest, { params }: P) {
   const { slug } = await params;
   if (!(await requireClanAdmin(slug))) return denied();
+  const clan = await resolveClan(slug);
+  if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
 
   const { id } = await req.json();
   await prisma.event.delete({ where: { id } });

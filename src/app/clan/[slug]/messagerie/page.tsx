@@ -188,7 +188,7 @@ export default function MessageriePage() {
   const isMuted = active?.members.some(m => m.user.id === session.user?.id && m.muted);
 
   return (
-    <div className="flex overflow-hidden" style={{ height: "calc(100vh - 61px)" }}>
+    <div className="flex overflow-hidden" style={{ height: "calc(100dvh - 61px)" }}>
       {/* Sidebar canaux */}
       <aside className={`${activeId ? "hidden md:flex" : "flex"} w-full md:w-60 shrink-0 flex-col border-r`}
         style={{ borderColor: "var(--beskar-700)", background: "var(--beskar-900)" }}>

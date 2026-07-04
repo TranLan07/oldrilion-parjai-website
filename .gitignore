@@ -44,3 +44,10 @@ next-env.d.ts
 /src/generated/prisma
 *.db
 *.db-journal
+
+# E2E (Playwright)
+/test-results/
+/playwright-report/
+/e2e/screenshots/
+/blob-report/
+/.last-run.json

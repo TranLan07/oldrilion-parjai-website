@@ -28,6 +28,9 @@ export async function POST(req: NextRequest, { params }: P) {
 export async function PUT(req: NextRequest, { params }: P) {
   const { slug } = await params;
   if (!(await requireClanAdmin(slug))) return denied();
+  const clan = await resolveClan(slug);
+  if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const { id, ...data } = await req.json();
   const section = await prisma.loreSection.update({ where: { id }, data });
   return NextResponse.json(section);
@@ -36,6 +39,9 @@ export async function PUT(req: NextRequest, { params }: P) {
 export async function DELETE(req: NextRequest, { params }: P) {
   const { slug } = await params;
   if (!(await requireClanAdmin(slug))) return denied();
+  const clan = await resolveClan(slug);
+  if (!clan) return notFound();
+  if (clan.suspended) return suspendedResponse();
   const { id } = await req.json();
   await prisma.loreSection.delete({ where: { id } });
   return NextResponse.json({ success: true });

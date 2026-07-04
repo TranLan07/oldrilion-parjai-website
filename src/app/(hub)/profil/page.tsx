@@ -167,7 +167,7 @@ export default function ProfilPage() {
           style={{ borderColor: "#2a2a2a", color: "#6b7280" }}
           onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "#4a4a4a"; (e.currentTarget as HTMLAnchorElement).style.color = "#9ca3af"; }}
           onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "#2a2a2a"; (e.currentTarget as HTMLAnchorElement).style.color = "#6b7280"; }}>
-          Traducteur Mando'a
+          Traducteur Mando&apos;a
         </Link>
         {profile.clan && (
           <Link href={`/clan/${profile.clan.slug}`}

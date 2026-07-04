@@ -11,6 +11,7 @@ type Channel = {
 };
 type Message = {
   id: string; content: string; createdAt: string;
+  mandoa: boolean; originalContent: string | null;
   user: { id: string; displayName: string; anonymous: boolean; publicId: string; grade: string; clanId: string | null; clan: ClanInfo };
 };
 type Clan = { id: string; name: string; colorPrimary: string };
@@ -32,6 +33,8 @@ export default function HubMessageriePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMsg, setNewMsg] = useState("");
   const [sending, setSending] = useState(false);
+  const [mandoaMode, setMandoaMode] = useState(false);
+  const isMandalorien = ((session as unknown as Record<string, unknown>)?.mandalorien as boolean) || false;
   const [showCreate, setShowCreate] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createDesc, setCreateDesc] = useState("");
@@ -48,7 +51,10 @@ export default function HubMessageriePage() {
     const data: Channel[] = await r.json();
     setChannels(data);
     if (firstLoad.current && data.length > 0) {
-      setActiveId(data[0].id);
+      // ?channel=<id> : sélection directe (ex: redirection depuis le Marketplace)
+      const requested = new URLSearchParams(window.location.search).get("channel");
+      const found = requested && data.find(c => c.id === requested);
+      setActiveId(found ? found.id : data[0].id);
       firstLoad.current = false;
     }
   }, []);
@@ -56,7 +62,8 @@ export default function HubMessageriePage() {
   useEffect(() => {
     if (!session) return;
     loadChannels();
-    fetch("/api/hub/admin/clans").then(r => r.ok ? r.json() : []).then((data: Clan[]) => setAllClans(data));
+    // Route publique : accessible à tous les connectés (badges de clans + création de canal)
+    fetch("/api/hub/clans").then(r => r.ok ? r.json() : []).then((data: Clan[]) => setAllClans(data));
   }, [session, loadChannels]);
 
   useEffect(() => {
@@ -100,7 +107,7 @@ export default function HubMessageriePage() {
     setSending(true);
     await fetch(`/api/hub/channels/${activeId}/messages`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: newMsg }),
+      body: JSON.stringify({ content: newMsg, mandoa: mandoaMode }),
     });
     setNewMsg("");
     setSending(false);
@@ -143,7 +150,7 @@ export default function HubMessageriePage() {
   const activeAccessClanInfos = allClans.filter(c => activeAccessClans.includes(c.id));
 
   return (
-    <div className="flex overflow-hidden" style={{ height: "calc(100vh - 61px)" }}>
+    <div className="flex overflow-hidden" style={{ height: "calc(100dvh - 61px)" }}>
       {/* Sidebar */}
       <aside className={`${activeId ? "hidden md:flex" : "flex"} w-full md:w-64 shrink-0 flex-col border-r`}
         style={{ borderColor: "#1a1a1a", background: "#080808" }}>
@@ -287,7 +294,19 @@ export default function HubMessageriePage() {
                       {new Date(msg.createdAt).toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}
                     </span>
                   </div>
-                  <p className="text-sm break-words" style={{ color: "#9ca3af" }}>{msg.content}</p>
+                  {msg.mandoa ? (
+                    <div>
+                      <p className="text-sm break-words italic" style={{ color: gold }}>{msg.content}</p>
+                      {msg.originalContent && isMandalorien && (
+                        <details className="mt-0.5">
+                          <summary className="cursor-pointer text-xs" style={{ color: "#4a4a4a" }}>Voir la traduction</summary>
+                          <p className="mt-1 text-sm" style={{ color: "#9ca3af" }}>{msg.originalContent}</p>
+                        </details>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm break-words" style={{ color: "#9ca3af" }}>{msg.content}</p>
+                  )}
                 </div>
               </div>
             );
@@ -302,10 +321,18 @@ export default function HubMessageriePage() {
               <p className="text-center text-sm" style={{ color: "#ef4444" }}>Vous êtes muté sur ce canal.</p>
             ) : (
               <div className="flex gap-2">
+                {isMandalorien && (
+                  <button type="button" onClick={() => setMandoaMode(!mandoaMode)}
+                    className="rounded px-3 py-2 text-xs font-semibold shrink-0"
+                    title={mandoaMode ? "Mode Mando'a actif" : "Activer le mode Mando'a"}
+                    style={{ background: mandoaMode ? "rgba(201,168,76,0.2)" : "#111", borderWidth: 1, borderStyle: "solid", borderColor: mandoaMode ? gold : "#2a2a2a", color: mandoaMode ? gold : "#4a4a4a" }}>
+                    Mando&apos;a
+                  </button>
+                )}
                 <input type="text" value={newMsg} onChange={e => setNewMsg(e.target.value)}
-                  placeholder={`Message ${active?.isPrivate ? "🔒" : "#"}${active?.name ?? ""}...`}
+                  placeholder={mandoaMode ? "Message en Mando'a..." : `Message ${active?.isPrivate ? "🔒" : "#"}${active?.name ?? ""}...`}
                   className="flex-1 rounded border px-4 py-2 text-sm outline-none"
-                  style={{ background: "#111", borderColor: "#2a2a2a", color: "#f2f2f5" }}
+                  style={{ background: "#111", borderColor: mandoaMode ? `${gold}40` : "#2a2a2a", color: "#f2f2f5" }}
                   disabled={sending} />
                 <button type="submit" disabled={sending || !newMsg.trim()}
                   className="rounded px-5 py-2 text-sm font-semibold disabled:opacity-50"
