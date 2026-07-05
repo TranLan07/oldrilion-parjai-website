@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 
 type User = { id: string; username: string; displayName: string; role: string; grade: string; specialization: string; permissionLevel: number };
-type Recruitment = { id: string; rpName: string; discord: string; experience: string; motivation: string; specialization: string; status: string; tempPassword?: string };
+type Recruitment = { id: string; rpName: string; discord: string; experience: string; motivation: string; specialization: string; status: string; tempPassword?: string; customAnswers?: string };
 type ChannelMemberAdmin = { muted: boolean; user: { id: string; displayName: string; grade: string; specialization: string } };
 type Channel = { id: string; name: string; description: string; isPrivate: boolean; members: ChannelMemberAdmin[]; _count: { messages: number } };
 type Mission = { id: string; title: string; description: string; status: string; confidentiality: string; maxParticipants: number; visibility: string; members: { user: { id: string; displayName: string } }[] };
@@ -118,7 +118,7 @@ export default function AdminPage() {
       </div>
 
       {tab === "users" && <UsersTab users={users} grades={grades} specs={specs} api={api} load={load} />}
-      {tab === "recruitment" && <RecruitmentTab recruitments={recruitments} slug={slug} load={load} />}
+      {tab === "recruitment" && <RecruitmentTab recruitments={recruitments} slug={slug} premium={clanPremium} load={load} />}
       {tab === "grades" && <GradesTab grades={grades} api={api} />}
       {tab === "channels" && <ChannelsTab channels={channels} users={users} grades={grades} specs={specs} slug={slug} premium={clanPremium} api={api} load={load} />}
       {tab === "missions" && <MissionsTab missions={missions} premium={clanPremium} api={api} />}
@@ -211,48 +211,162 @@ function UsersTab({ users, grades, specs, api, load }: { users: User[]; grades: 
 }
 
 // ── Recruitment ──
-function RecruitmentTab({ recruitments, slug, load }: { recruitments: Recruitment[]; slug: string; load: () => void }) {
+function RecruitmentTab({ recruitments, slug, premium, load }: { recruitments: Recruitment[]; slug: string; premium: boolean; load: () => void }) {
   async function handle(id: string, action: "approve" | "reject") {
     const res = await fetch(`/api/clan/${slug}/admin/recruitment`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) });
     const data = await res.json();
-    if (action === "approve" && data.tempPassword) {
-      // Will show in the UI via tempPassword field
-    }
     load();
-    // Show the result inline
     if (action === "approve" && data.username) {
       const el = document.getElementById(`recruit-result-${id}`);
       if (el) el.textContent = `✓ Compte créé — Login: ${data.username} — MDP: ${data.tempPassword}`;
     }
   }
+  function parseAnswers(s?: string): Array<{ label: string; value: string }> {
+    if (!s) return [];
+    try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; }
+  }
   return (
-    <div className="space-y-4">
-      {recruitments.length === 0 && <p className="text-foreground/50">Aucune candidature en attente.</p>}
-      {recruitments.map((r) => (
-        <div key={r.id} className="rounded-lg border border-accent-dim/20 bg-surface p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="font-semibold text-accent">{r.rpName}</h3>
-              <p className="text-sm text-foreground/50">Discord: {r.discord} {r.specialization && `• Spé: ${r.specialization}`}</p>
+    <div className="space-y-6">
+      <RecruitmentFieldsBuilder slug={slug} premium={premium} />
+
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--gold-500)" }}>Candidatures</h3>
+        {recruitments.length === 0 && <p className="text-foreground/50">Aucune candidature en attente.</p>}
+        {recruitments.map((r) => {
+          const answers = parseAnswers(r.customAnswers).filter(a => a.value);
+          return (
+            <div key={r.id} className="rounded-lg border border-accent-dim/20 bg-surface p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-accent">{r.rpName}</h3>
+                  <p className="text-sm text-foreground/50">Discord: {r.discord} {r.specialization && `• Spé: ${r.specialization}`}</p>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs ${r.status === "pending" ? "bg-yellow-900/30 text-yellow-400" : r.status === "approved" ? "bg-green-900/30 text-green-400" : "bg-red-900/30 text-red-400"}`}>
+                  {r.status === "pending" ? "En attente" : r.status === "approved" ? "Approuvée" : "Rejetée"}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 text-sm text-foreground/70 sm:grid-cols-2">
+                <div><span className="font-medium text-foreground/50">Expérience RP:</span><p className="mt-0.5">{r.experience}</p></div>
+                <div><span className="font-medium text-foreground/50">Motivation:</span><p className="mt-0.5">{r.motivation}</p></div>
+                {answers.map((a, i) => (
+                  <div key={i}><span className="font-medium text-foreground/50">{a.label}:</span><p className="mt-0.5">{a.value}</p></div>
+                ))}
+              </div>
+              {r.tempPassword && <p className="mt-3 rounded bg-accent/10 px-3 py-2 text-sm text-accent">MDP temporaire: <strong className="select-all">{r.tempPassword}</strong></p>}
+              <p id={`recruit-result-${r.id}`} className="mt-2 text-sm font-medium text-green-400"></p>
+              {r.status === "pending" && (
+                <div className="mt-3 flex gap-2">
+                  <button onClick={() => handle(r.id, "approve")} className={btnGreen}>Approuver</button>
+                  <button onClick={() => handle(r.id, "reject")} className={btnDanger}>Rejeter</button>
+                </div>
+              )}
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs ${r.status === "pending" ? "bg-yellow-900/30 text-yellow-400" : r.status === "approved" ? "bg-green-900/30 text-green-400" : "bg-red-900/30 text-red-400"}`}>
-              {r.status === "pending" ? "En attente" : r.status === "approved" ? "Approuvée" : "Rejetée"}
-            </span>
-          </div>
-          <div className="mt-3 grid gap-2 text-sm text-foreground/70 sm:grid-cols-2">
-            <div><span className="font-medium text-foreground/50">Expérience RP:</span><p className="mt-0.5">{r.experience}</p></div>
-            <div><span className="font-medium text-foreground/50">Motivation:</span><p className="mt-0.5">{r.motivation}</p></div>
-          </div>
-          {r.tempPassword && <p className="mt-3 rounded bg-accent/10 px-3 py-2 text-sm text-accent">MDP temporaire: <strong className="select-all">{r.tempPassword}</strong></p>}
-          <p id={`recruit-result-${r.id}`} className="mt-2 text-sm font-medium text-green-400"></p>
-          {r.status === "pending" && (
-            <div className="mt-3 flex gap-2">
-              <button onClick={() => handle(r.id, "approve")} className={btnGreen}>Approuver</button>
-              <button onClick={() => handle(r.id, "reject")} className={btnDanger}>Rejeter</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+type RField = { label: string; type: string; options: string[]; required: boolean };
+const FIELD_TYPES = [
+  { v: "text", l: "Texte court" },
+  { v: "textarea", l: "Texte long" },
+  { v: "radio", l: "Choix unique (radio)" },
+  { v: "checkbox", l: "Choix multiple (cases)" },
+];
+
+// Form builder des champs custom du recrutement (premium, max 10 champs).
+function RecruitmentFieldsBuilder({ slug, premium }: { slug: string; premium: boolean }) {
+  const [fields, setFields] = useState<RField[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    fetch(`/api/clan/${slug}/admin/recruitment-fields`).then(r => r.ok ? r.json() : null).then(d => {
+      if (d) setFields((d.fields || []).map((f: RField) => ({ label: f.label, type: f.type, options: f.options || [], required: f.required })));
+      setLoaded(true);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function update(i: number, patch: Partial<RField>) { setFields(fs => fs.map((f, j) => j === i ? { ...f, ...patch } : f)); }
+  function addField() { if (fields.length < 10) setFields(fs => [...fs, { label: "", type: "text", options: [], required: false }]); }
+  function removeField(i: number) { setFields(fs => fs.filter((_, j) => j !== i)); }
+  function move(i: number, dir: -1 | 1) {
+    setFields(fs => { const n = [...fs]; const j = i + dir; if (j < 0 || j >= n.length) return n; [n[i], n[j]] = [n[j], n[i]]; return n; });
+  }
+  function setOption(i: number, oi: number, val: string) { update(i, { options: fields[i].options.map((o, k) => k === oi ? val : o) }); }
+  function addOption(i: number) { if (fields[i].options.length < 5) update(i, { options: [...fields[i].options, ""] }); }
+  function removeOption(i: number, oi: number) { update(i, { options: fields[i].options.filter((_, k) => k !== oi) }); }
+
+  async function save() {
+    setSaving(true); setMsg("");
+    const r = await fetch(`/api/clan/${slug}/admin/recruitment-fields`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields }),
+    });
+    const d = await r.json();
+    setSaving(false);
+    setMsg(r.ok ? "Formulaire enregistré." : (d.error || "Erreur"));
+    setTimeout(() => setMsg(""), 3000);
+  }
+
+  if (!loaded) return null;
+
+  return (
+    <div className="rounded-lg border p-5 space-y-4" style={{ borderColor: "rgba(201,168,76,0.25)", background: "rgba(201,168,76,0.04)" }}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: "#c9a84c" }}>★ Formulaire de recrutement</h3>
+        <span className="text-xs" style={{ color: "var(--beskar-400)" }}>{fields.length}/10 champs</span>
+      </div>
+
+      {!premium ? (
+        <p className="text-sm" style={{ color: "var(--beskar-400)" }}>
+          L&apos;ajout de champs personnalisés (jusqu&apos;à 10 : texte, zone de texte, choix unique/multiple) est réservé aux clans premium.
+          Les champs par défaut (Nom RP, Discord, Spécialisation, Expérience, Motivation) restent toujours actifs.
+        </p>
+      ) : (
+        <>
+          <p className="text-xs" style={{ color: "var(--beskar-400)" }}>
+            Ces champs s&apos;ajoutent aux champs par défaut. Types : texte, zone de texte, choix unique/multiple (max 5 options).
+          </p>
+          {fields.map((f, i) => (
+            <div key={i} className="rounded border p-3 space-y-2" style={{ borderColor: "var(--beskar-700)", background: "var(--beskar-900)" }}>
+              <div className="flex flex-wrap items-center gap-2">
+                <input value={f.label} onChange={e => update(i, { label: e.target.value })} placeholder="Intitulé du champ"
+                  className={`flex-1 min-w-[160px] ${inp}`} />
+                <select value={f.type} onChange={e => update(i, { type: e.target.value, options: (e.target.value === "radio" || e.target.value === "checkbox") && f.options.length === 0 ? [""] : f.options })} className={inp} style={{ width: "auto" }}>
+                  {FIELD_TYPES.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
+                </select>
+                <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--beskar-300)" }}>
+                  <input type="checkbox" checked={f.required} onChange={e => update(i, { required: e.target.checked })} /> Requis
+                </label>
+                <button onClick={() => move(i, -1)} className="px-2 text-xs" style={{ color: "var(--beskar-400)" }} title="Monter">▲</button>
+                <button onClick={() => move(i, 1)} className="px-2 text-xs" style={{ color: "var(--beskar-400)" }} title="Descendre">▼</button>
+                <button onClick={() => removeField(i)} className="px-2 text-xs" style={{ color: "#ef4444" }} title="Supprimer">✕</button>
+              </div>
+              {(f.type === "radio" || f.type === "checkbox") && (
+                <div className="space-y-1.5 pl-2">
+                  <p className="text-xs" style={{ color: "var(--beskar-500)" }}>Options ({f.options.length}/5)</p>
+                  {f.options.map((o, oi) => (
+                    <div key={oi} className="flex items-center gap-2">
+                      <input value={o} onChange={e => setOption(i, oi, e.target.value)} placeholder={`Option ${oi + 1}`} className={`flex-1 ${inp}`} />
+                      <button onClick={() => removeOption(i, oi)} className="px-2 text-xs" style={{ color: "#ef4444" }}>✕</button>
+                    </div>
+                  ))}
+                  {f.options.length < 5 && <button onClick={() => addOption(i)} className="text-xs" style={{ color: "#c9a84c" }}>+ Option</button>}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      ))}
+          ))}
+          <div className="flex flex-wrap items-center gap-2">
+            {fields.length < 10 && <button onClick={addField} className={btnSecondary}>+ Ajouter un champ</button>}
+            <button onClick={save} disabled={saving} className={btnPrimary + " disabled:opacity-50"}>{saving ? "..." : "Enregistrer le formulaire"}</button>
+            {msg && <span className="text-xs" style={{ color: msg.includes("enregistré") ? "#22c55e" : "#ef4444" }}>{msg}</span>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1117,7 +1231,7 @@ function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
   ];
   const premiumFields = [
     { field: "colorText" as const, label: "Texte", hint: "Couleur de texte custom" },
-    { field: "colorCard" as const, label: "Cartes", hint: "Fond des cartes / panneaux" },
+    { field: "colorCard" as const, label: "Surface", hint: "Fond du header, du footer et des cartes" },
   ];
 
   function Picker({ field, label, hint }: { field: keyof typeof colors; label: string; hint: string }) {

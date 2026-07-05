@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
-type Spec = { id: string; name: string; description: string; secret: boolean; order: number };
+type Spec = { id: string; name: string; description: string; secret: boolean; color: string | null; order: number };
 type ClanInfo = { name: string; description: string; colorPrimary: string; colorAccent: string };
 
 export default function Home() {
@@ -109,15 +109,17 @@ export default function Home() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {specs.map((spec) => {
                 const isSecret = spec.secret;
-                const color = isSecret ? "#a259e0" : primary;
+                // Couleur custom de la spé (premium) prioritaire sur le fallback.
+                const color = spec.color || (isSecret ? "#a259e0" : primary);
                 const isOpen = openSpec === spec.id;
+                const borderColor = isOpen ? color : (spec.color ? `${spec.color}55` : "var(--beskar-600)");
 
                 return (
                   <div key={spec.id}
                     className="cursor-pointer rounded-sm p-6 text-center transition-all"
                     style={{
                       background: isOpen ? "var(--beskar-700)" : "var(--beskar-800)",
-                      border: `1px solid ${isOpen ? color : "var(--beskar-600)"}`,
+                      border: `1px solid ${borderColor}`,
                     }}
                     onClick={() => setOpenSpec(isOpen ? null : spec.id)}
                   >

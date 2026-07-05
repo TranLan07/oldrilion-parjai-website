@@ -54,7 +54,27 @@ async function main() {
     },
   });
 
-  console.log("E2E seed OK : e2e_webmaster / e2etest123 (Parjai, perm 10) + e2e_target (jetable)");
+  // Membre jetable de Parjai : sert à tester le départ de clan (ré-affilié à chaque seed).
+  await prisma.user.upsert({
+    where: { username: "e2e_leaver" },
+    update: { clanId: parjai.id, permissionLevel: 1, mandalorien: true, grade: "Recrue" },
+    create: {
+      publicId: "E2ELVR",
+      username: "e2e_leaver",
+      passwordHash: hash,
+      displayName: "E2E Leaver",
+      hubRole: "member",
+      role: "membre",
+      clanId: parjai.id,
+      grade: "Recrue",
+      specialization: "Kyramud",
+      permissionLevel: 1,
+      mustChangePassword: false,
+      mandalorien: true,
+    },
+  });
+
+  console.log("E2E seed OK : e2e_webmaster (Parjai, perm 10) + e2e_target (jetable) + e2e_leaver (Parjai, jetable)");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());

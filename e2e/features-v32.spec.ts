@@ -19,8 +19,8 @@ test.describe("Profil — carte clan + header contextuel", () => {
     await expect(page.getByText("Mon clan")).toBeVisible();
     await expect(page.getByText("PARJAI")).toBeVisible();
     await expect(page.getByText("Niveau d'accès", { exact: true })).toBeVisible();
-    await expect(page.getByText("Mand'alor")).toBeVisible();     // grade
-    await expect(page.getByText("Kyramud")).toBeVisible();       // spécialisation
+    await expect(page.getByText("Mand'alor")).toBeVisible();       // grade
+    await expect(page.getByText("Kyramud").first()).toBeVisible(); // spécialisation
     await page.screenshot({ path: "e2e/screenshots/profil-hub.png", fullPage: true });
   });
 
@@ -75,25 +75,71 @@ test.describe("App dropdown clan — Marketplace premium", () => {
   });
 });
 
-test.describe("Mode debug", () => {
-  test("s'active depuis le profil, affiche le panneau et simule le niveau d'accès", async ({ page }) => {
+test.describe("Personnalisation premium — surface (header/footer/cartes)", () => {
+  test("la couleur de surface s'applique au header du clan", async ({ page }) => {
+    await login(page, "e2e_webmaster", "e2etest123");
+    try {
+      // Applique une couleur de surface distinctive (admin d'un clan premium)
+      const put = await page.request.put("/api/clan/parjai/admin/settings", { data: { colorCard: "#123456" } });
+      expect(put.ok()).toBeTruthy();
+
+      await page.goto("/clan/parjai", { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(500);
+
+      // Le fond du header (nav) doit refléter la couleur de surface (#123456 = rgb(18,52,86))
+      const navBg = await page.evaluate(() => getComputedStyle(document.querySelector("nav")!).backgroundColor);
+      expect(navBg).toBe("rgb(18, 52, 86)");
+
+      const footerBg = await page.evaluate(() => getComputedStyle(document.querySelector("footer")!).backgroundColor);
+      expect(footerBg).toBe("rgb(18, 52, 86)");
+    } finally {
+      // Réinitialise pour l'idempotence
+      await page.request.put("/api/clan/parjai/admin/settings", { data: { colorCard: "#0d0d0d" } });
+    }
+  });
+});
+
+test.describe("Mode debug (étoffé)", () => {
+  test("panneau complet : permission clan custom, rôle hub, visiteur", async ({ page }) => {
     await login(page, "e2e_webmaster", "e2etest123");
     await page.goto("/profil", { waitUntil: "domcontentloaded" });
 
     // Active le mode debug via le toggle du profil
     await page.getByRole("button", { name: "Activer le mode debug" }).click();
-    // Le panneau flottant apparaît (texte unique au panneau)
     await expect(page.getByText(/Simule l'affichage pour un utilisateur/i)).toBeVisible();
-    await expect(page.locator('input[type="range"]')).toBeVisible();
 
-    // Va sur l'espace clan : l'onglet Admin est visible (webmaster perm 10)
+    // Les contrôles clés du panneau sont présents (textes uniques au panneau)
+    await expect(page.getByText("Permission HUB")).toBeVisible();
+    await expect(page.getByText("Niveau de permission clan custom")).toBeVisible();
+    await expect(page.getByText("Vision d'un visiteur sans compte")).toBeVisible();
+
+    // Sur l'espace clan, l'onglet Admin est visible (webmaster perm 10)
     await page.goto("/clan/parjai", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("link", { name: "Admin", exact: true })).toBeVisible();
 
-    // Simule un niveau 1 : le lien Admin doit disparaître de la navigation
+    // Active la permission custom → slider apparaît → niveau 1 → Admin disparaît
+    await page.getByLabel("Niveau de permission clan custom").check();
+    await expect(page.locator('input[type="range"]')).toBeVisible();
     await page.locator('input[type="range"]').fill("1");
     await expect(page.getByRole("link", { name: "Admin", exact: true })).toHaveCount(0);
 
     await page.screenshot({ path: "e2e/screenshots/debug-mode.png" });
+
+    // Vision visiteur : la navbar clan repasse en mode déconnecté (Recrutement visible, profil masqué)
+    await page.getByLabel("Vision d'un visiteur sans compte").check();
+    await expect(page.getByRole("link", { name: "Recrutement" })).toBeVisible();
+  });
+
+  test("simuler rôle hub Admin fait apparaître le lien Admin Hub", async ({ page }) => {
+    await login(page, "e2e_leaver", "e2etest123"); // membre simple (hubRole member)
+    await page.goto("/profil", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Activer le mode debug" }).click();
+
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("link", { name: "Admin Hub" })).toHaveCount(0);
+
+    // Simule hubRole = admin
+    await page.locator("select").first().selectOption("admin");
+    await expect(page.getByRole("link", { name: "Admin Hub" })).toBeVisible();
   });
 });

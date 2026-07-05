@@ -4,14 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
+import { useEffectiveSession } from "./DebugContext";
 
 const linkStyle = "block px-3 py-2 text-sm font-semibold uppercase tracking-[0.14em] transition-colors";
 
 export default function Navbar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
-  const clanSlug = (session as unknown as Record<string, unknown>)?.clanSlug as string | undefined;
+  // Identité effective (réelle ou simulée via le mode debug).
+  const eff = useEffectiveSession();
+  const loggedIn = eff.loggedIn;
+  const hubRole = eff.hubRole;
+  const clanSlug = eff.clanSlug ?? undefined;
   const [open, setOpen] = useState(false);
   const [appOpen, setAppOpen] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -79,7 +83,7 @@ export default function Navbar() {
         {/* Desktop */}
         <ul className="hidden items-center gap-0.5 lg:flex">
           {publicLinks.map(l => <li key={l.href}><NavLink {...l} /></li>)}
-          {session && (
+          {loggedIn && (
             <li className="relative" onMouseEnter={() => setAppOpen(true)} onMouseLeave={() => setAppOpen(false)}>
               <button className={`${linkStyle} relative inline-flex items-center gap-1`}
                 style={{ fontFamily: "var(--font-display)", color: appLinks.some(l => pathname === l.href) ? "#f2f2f5" : "#9ca3af" }}>
@@ -102,8 +106,8 @@ export default function Navbar() {
               )}
             </li>
           )}
-          {session && privateLinks.map(l => <li key={l.href}><NavLink href={l.href} label={l.label} badge={(l as {badge?: number}).badge} /></li>)}
-          {session && clanSlug && (
+          {loggedIn && privateLinks.map(l => <li key={l.href}><NavLink href={l.href} label={l.label} badge={(l as {badge?: number}).badge} /></li>)}
+          {loggedIn && clanSlug && (
             <li>
               <Link href={`/clan/${clanSlug}`}
                 className="rounded-sm border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] transition-all"
@@ -114,7 +118,7 @@ export default function Navbar() {
             </li>
           )}
           <li className="ml-2">
-            {session ? (
+            {loggedIn ? (
               <Link href="/profil" className="relative flex items-center justify-center rounded-full transition-all"
                 style={{ width: "34px", height: "34px", background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#9ca3af" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "#f2f2f5"; (e.currentTarget as HTMLAnchorElement).style.color = "#f2f2f5"; }}
@@ -152,7 +156,7 @@ export default function Navbar() {
       {open && (
         <div className="border-t px-4 pb-4 pt-2 lg:hidden" style={{ borderColor: "#2a2a2a", background: "#0a0a0a" }}>
           {publicLinks.map(l => <NavLink key={l.href} {...l} />)}
-          {session && (
+          {loggedIn && (
             <>
               <div className="my-2 h-px" style={{ background: "#2a2a2a" }} />
               {appLinks.map(l => <NavLink key={l.href} {...l} />)}
@@ -160,13 +164,13 @@ export default function Navbar() {
             </>
           )}
           <div className="mt-3 flex flex-col gap-2">
-            {session && clanSlug && (
+            {loggedIn && clanSlug && (
               <Link href={`/clan/${clanSlug}`}
                 className="block w-full rounded-sm border px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em]"
                 style={{ fontFamily: "var(--font-display)", borderColor: "#c9a84c40", color: "#c9a84c" }}
               >Mon Clan</Link>
             )}
-            {session ? (
+            {loggedIn ? (
               <Link href="/profil"
                 className="block w-full rounded-sm border px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em]"
                 style={{ fontFamily: "var(--font-display)", borderColor: "#2a2a2a", color: "#9ca3af" }}

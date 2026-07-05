@@ -24,10 +24,18 @@ export default async function ClanLayout({ children, params }: Props) {
   if (!clan) notFound();
   const diplomacyPublic = !clan.pagePerms[0] || clan.pagePerms[0].minPermission <= 1;
 
-  // Personnalisation premium : couleur de texte et de fond des cartes.
+  // Personnalisation premium : couleur de texte et couleur de surface (fond du
+  // header, du footer et des cartes). Pour les clans premium on remappe aussi les
+  // surfaces beskar utilisées par les pages, afin d'unifier le fond des cartes.
   // Les clans non-premium retombent sur les valeurs par défaut du thème.
   const textVar = clan.premium ? `--clan-text: ${clan.colorText};` : "";
-  const cardVar = clan.premium ? `--clan-card: ${clan.colorCard};` : "";
+  const surfaceVars = clan.premium
+    ? `
+      --clan-card: ${clan.colorCard};
+      --beskar-900: ${clan.colorCard};
+      --beskar-800: ${clan.colorCard};
+    `
+    : "";
   const themeVars = `
     :root {
       --clan-bg: ${clan.colorBg};
@@ -36,7 +44,7 @@ export default async function ClanLayout({ children, params }: Props) {
       --accent: ${clan.colorPrimary};
       --accent-dim: ${clan.colorAccent};
       ${textVar}
-      ${cardVar}
+      ${surfaceVars}
     }
   `;
 

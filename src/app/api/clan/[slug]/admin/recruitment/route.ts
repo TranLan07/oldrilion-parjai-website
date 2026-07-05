@@ -20,20 +20,7 @@ export async function GET(_: Request, { params }: P) {
   return NextResponse.json(recruitments);
 }
 
-export async function POST(req: NextRequest, { params }: P) {
-  const { slug } = await params;
-  const clan = await resolveClan(slug);
-  if (!clan) return notFound();
-  if (clan.suspended) return suspendedResponse();
-  const { rpName, discord, experience, motivation, specialization } = await req.json();
-  if (!rpName || !discord || !experience || !motivation) {
-    return NextResponse.json({ error: "Tous les champs sont requis" }, { status: 400 });
-  }
-  const recruitment = await prisma.recruitment.create({
-    data: { clanId: clan.id, rpName, discord, experience, motivation, specialization: specialization || "" },
-  });
-  return NextResponse.json(recruitment);
-}
+// La soumission publique est gérée par /api/clan/[slug]/recruitment (POST).
 
 export async function PUT(req: NextRequest, { params }: P) {
   const { slug } = await params;
@@ -48,7 +35,50 @@ export async function PUT(req: NextRequest, { params }: P) {
   if (action === "approve") {
     const recruitment = await prisma.recruitment.findUnique({ where: { id } });
     if (!recruitment) return NextResponse.json({ error: "Candidature introuvable" }, { status: 404 });
+    if (recruitment.status === "approved") return NextResponse.json({ error: "Candidature déjà approuvée" }, { status: 400 });
 
+    // Le candidat a déjà un compte (sans-clan connecté au moment de la candidature).
+    const existing = recruitment.applicantId
+      ? await prisma.user.findUnique({ where: { id: recruitment.applicantId }, select: { id: true, username: true, displayName: true, clanId: true, mandalorien: true } })
+      : null;
+
+    if (existing) {
+      // Impossible d'accepter quelqu'un qui appartient déjà à un clan.
+      if (existing.clanId) {
+        return NextResponse.json({ error: "Ce candidat appartient déjà à un clan." }, { status: 400 });
+      }
+      // On n'ouvre pas de nouveau compte : on rattache le compte existant au clan.
+      const user = await prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          clanId: clan.id,
+          role: "membre",
+          grade: "Recrue",
+          gradeId: null,
+          specializationId: null,
+          specialization: recruitment.specialization,
+          permissionLevel: 1,
+          mandalorien: true, // membre d'un clan => mandalorien
+        },
+      });
+      await prisma.recruitment.update({ where: { id }, data: { status: "approved", userId: user.id } });
+
+      const generalChannel = await prisma.channel.findFirst({ where: { clanId: clan.id, name: "général" } });
+      if (generalChannel) {
+        await prisma.channelMember.upsert({
+          where: { userId_channelId: { userId: user.id, channelId: generalChannel.id } },
+          create: { userId: user.id, channelId: generalChannel.id },
+          update: {},
+        });
+      }
+      await prisma.notification.create({
+        data: { userId: user.id, type: "recruitment", title: "Candidature acceptée", body: `Vous avez rejoint le clan ${clan.name}.` },
+      });
+
+      return NextResponse.json({ success: true, existingAccount: true, username: existing.username });
+    }
+
+    // Candidat sans compte : on en crée un nouveau.
     const tempPassword = Math.random().toString(36).slice(2, 10);
     const username = recruitment.rpName.toLowerCase().replace(/[^a-z0-9]/g, "");
     const publicId = await generatePublicId();

@@ -37,17 +37,38 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
   const [msg, setMsg] = useState("");
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [notifFilter, setNotifFilter] = useState<"all" | "unread">("unread");
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [publicSpecs, setPublicSpecs] = useState<string[]>([]);
+  const [coverSaving, setCoverSaving] = useState(false);
 
   useEffect(() => {
     if (!session?.user?.id) return;
     fetch("/api/profil").then(r => r.ok ? r.json() : null).then((d: UserProfile) => {
       setProfile(d);
       setDisplayName(d?.displayName ?? "");
+      // Spés publiques du clan (pour choisir une couverture)
+      if (d?.clan?.slug) {
+        fetch(`/api/clan/${d.clan.slug}/specializations`).then(r => r.ok ? r.json() : []).then((specs: { name: string; secret: boolean }[]) => {
+          setPublicSpecs(specs.filter(s => !s.secret).map(s => s.name));
+        }).catch(() => {});
+      }
     });
     fetch("/api/notifications").then(r => r.ok ? r.json() : []).then(setNotifs);
   }, [session]);
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(""), 3000); }
+
+  async function saveCover(value: string) {
+    setCoverSaving(true);
+    const r = await fetch("/api/profil", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ publicSpecialization: value }),
+    });
+    setCoverSaving(false);
+    if (r.ok) { setProfile(p => p ? { ...p, publicSpecialization: value } : p); flash("Couverture publique mise à jour."); }
+    else flash("Couverture invalide.");
+  }
 
   async function saveName() {
     if (!displayName.trim()) return;
@@ -78,6 +99,19 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
     setNotifs([]);
   }
 
+  async function leaveClan() {
+    setLeaving(true);
+    const r = await fetch("/api/profil/leave-clan", { method: "POST" });
+    if (r.ok) {
+      // Recharge pour rafraîchir la session (navbar, DA) et le profil.
+      window.location.href = scope === "hub" ? "/profil" : "/";
+    } else {
+      setLeaving(false);
+      setConfirmLeave(false);
+      flash("Impossible de quitter le clan.");
+    }
+  }
+
   if (!session) return <div className="p-12 text-center text-sm" style={{ color: "#6b7280" }}>Connectez-vous pour voir votre profil.</div>;
   if (!profile) return <div className="p-12 text-center text-sm" style={{ color: "#6b7280" }}>Chargement...</div>;
 
@@ -89,6 +123,29 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-16">
+      {/* Pop-up de confirmation : quitter le clan */}
+      {confirmLeave && clan && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.7)" }}
+          onClick={() => !leaving && setConfirmLeave(false)}>
+          <div className="w-full max-w-sm rounded-lg border p-6" style={{ borderColor: "#ef444455", background: "#0d0d0d" }} onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold uppercase tracking-[0.1em]" style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>Quitter le clan ?</h3>
+            <p className="mt-2 text-sm" style={{ color: "#9ca3af" }}>
+              Vous allez quitter <strong style={{ color: clan.colorPrimary }}>{clan.name}</strong>. Vous perdrez votre grade, votre spécialisation et votre niveau d&apos;accès. Cette action est irréversible.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setConfirmLeave(false)} disabled={leaving}
+                className="rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.1em]" style={{ borderColor: "#2a2a2a", color: "#9ca3af" }}>
+                Annuler
+              </button>
+              <button onClick={leaveClan} disabled={leaving}
+                className="rounded-sm px-4 py-2 text-xs font-semibold uppercase tracking-[0.1em] disabled:opacity-50" style={{ background: "#ef4444", color: "#fff" }}>
+                {leaving ? "..." : "Quitter le clan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="mb-1 text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: "#4a4a4a" }}>
         {scope === "hub" ? "Hub" : clan?.name ?? "Clan"}
       </p>
@@ -133,11 +190,20 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
                 <p className="text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: clan.colorPrimary, opacity: 0.7 }}>Mon clan</p>
                 <h2 className="text-2xl font-bold uppercase tracking-[0.12em]" style={{ fontFamily: "var(--font-display)", color: clan.colorPrimary }}>{clan.name}</h2>
               </div>
-              <Link href={`/clan/${clan.slug}`}
-                className="rounded-sm border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em]"
-                style={{ borderColor: clan.colorPrimary + "55", color: clan.colorPrimary }}>
-                Espace clan →
-              </Link>
+              <div className="flex flex-col items-end gap-2">
+                <Link href={`/clan/${clan.slug}`}
+                  className="rounded-sm border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em]"
+                  style={{ borderColor: clan.colorPrimary + "55", color: clan.colorPrimary }}>
+                  Espace clan →
+                </Link>
+                <button onClick={() => setConfirmLeave(true)}
+                  className="rounded-sm border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-all"
+                  style={{ borderColor: "#ef444455", color: "#ef4444" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#ef444455"; e.currentTarget.style.background = "transparent"; }}>
+                  Quitter le clan
+                </button>
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <ClanCard label="Grade" value={profile.grade || "---"} accent={clan.colorPrimary} />
@@ -151,10 +217,18 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
                 accent={specColor}
                 badge={profile.specializationSecret ? "secrète" : undefined}
               />
-              {profile.specializationSecret && (
-                <ClanCard label="Couverture publique" value={profile.publicSpecialization || "---"} accent={clan.colorPrimary}
-                  hint="Ce que les non-initiés voient" />
-              )}
+              {/* Couverture publique : choisir une spé publique du clan pour masquer son identité */}
+              <div className="rounded-sm px-4 py-3" style={{ background: "rgba(0,0,0,0.35)", border: `1px solid ${clan.colorPrimary}33` }}>
+                <p className="text-xs uppercase tracking-[0.2em]" style={{ color: clan.colorPrimary, opacity: 0.7 }}>Couverture publique</p>
+                <select value={profile.publicSpecialization || ""} disabled={coverSaving}
+                  onChange={e => saveCover(e.target.value)}
+                  className="mt-1 w-full rounded-sm border px-2 py-1.5 text-sm outline-none disabled:opacity-50"
+                  style={{ background: "#111", borderColor: `${clan.colorPrimary}33`, color: "#f2f2f5" }}>
+                  <option value="">Aucune (spé réelle affichée)</option>
+                  {publicSpecs.map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
+                <p className="mt-1 text-[10px]" style={{ color: "#6b7280" }}>Ce que les non-initiés voient à votre place.</p>
+              </div>
             </div>
           </div>
         </section>

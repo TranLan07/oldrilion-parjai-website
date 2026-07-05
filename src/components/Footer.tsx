@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function Footer() {
   return (
-    <footer className="border-t" style={{ borderColor: "#1a1a1a", background: "#080808" }}>
+    <footer className="border-t" style={{ borderColor: "#1a1a1a", background: "var(--clan-card, #080808)" }}>
       <div className="mx-auto max-w-[1200px] px-6 py-10">
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div>

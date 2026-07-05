@@ -29,6 +29,7 @@ model Clan {
   events        Event[]
   whitelist     ClanWhitelist[]
   recruitments  Recruitment[]
+  recruitmentFields RecruitmentField[]
   loreSections  LoreSection[]
   ruleSections  RuleSection[]
   tags          ClanTag[]
@@ -193,12 +194,26 @@ model Recruitment {
   experience     String
   motivation     String
   specialization String   @default("")
+  customAnswers  String   @default("[]") // réponses aux champs custom : JSON [{label, value}]
+  applicantId    String?  // compte existant du candidat (sans-clan connecté), s'il y en a un
   status         String   @default("pending") // pending | approved | rejected
   tempPassword   String?
   userId         String?  @unique
   user           User?    @relation("applicant", fields: [userId], references: [id])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// Champs personnalisés du formulaire de recrutement (premium, max 10 par clan)
+model RecruitmentField {
+  id       String  @id @default(cuid())
+  clanId   String
+  clan     Clan    @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  label    String
+  type     String  // "text" | "textarea" | "checkbox" | "radio"
+  options  String  @default("[]") // JSON array d'options (radio/checkbox, max 5)
+  required Boolean @default(false)
+  order    Int     @default(0)
 }
 
 model PagePermission {

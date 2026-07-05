@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
-import { useDebug } from "./DebugContext";
+import { useEffectiveSession } from "./DebugContext";
 
 type Props = { slug: string; clanName: string; diplomacyPublic?: boolean; premium?: boolean };
 
@@ -13,26 +12,20 @@ const linkStyle = "block px-3 py-2 text-sm font-semibold uppercase tracking-[0.1
 export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }: Props) {
   const base = `/clan/${slug}`;
   const pathname = usePathname();
-  const { data: session } = useSession();
-  const perm = (session as unknown as Record<string, unknown>)?.permissionLevel as number | undefined;
-  const sessionClanSlug = (session as unknown as Record<string, unknown>)?.clanSlug as string | undefined;
-  const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
+  // Identité effective (réelle ou simulée via le mode debug).
+  const eff = useEffectiveSession();
+  const loggedIn = eff.loggedIn;
   const [open, setOpen] = useState(false);
   const [appOpen, setAppOpen] = useState(false);
-  const dbg = useDebug();
 
   useEffect(() => { setOpen(false); setAppOpen(false); }, [pathname]);
 
-  const realEffectivePerm = session
-    ? (sessionClanSlug === slug ? (perm ?? 1) : 1)
+  // Niveau d'accès effectif dans CE clan : perm réelle/simulée si membre, sinon 1 (autre clan) / 0 (visiteur).
+  const effectivePerm = loggedIn
+    ? (eff.clanSlug === slug ? (eff.permissionLevel || 1) : 1)
     : 0;
-  // Mode debug : simule le niveau d'accès pour prévisualiser la navigation.
-  const debugPerm = dbg?.enabled && dbg.perm !== null ? dbg.perm : null;
-  const effectivePerm = debugPerm ?? realEffectivePerm;
 
-  const isAdmin = debugPerm !== null
-    ? debugPerm >= 10
-    : (hubRole === "admin" || (sessionClanSlug === slug && (perm ?? 0) >= 10));
+  const isAdmin = loggedIn && (eff.hubRole === "admin" || (eff.clanSlug === slug && eff.permissionLevel >= 10));
 
   // Liens toujours visibles (statiques / partagés en lien externe)
   const publicLinks = [
@@ -41,7 +34,7 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }:
     { href: `${base}/regles`, label: "Règles" },
     { href: `${base}/membres`, label: "Membres" },
     ...(diplomacyPublic ? [{ href: `${base}/diplomatie`, label: "Diplomatie" }] : []),
-    ...(!session ? [{ href: `${base}/recrutement`, label: "Recrutement" }] : []),
+    ...(!loggedIn ? [{ href: `${base}/recrutement`, label: "Recrutement" }] : []),
   ];
 
   // Liens dans le dropdown "App" (fonctionnalités actives, membres connectés)
@@ -57,7 +50,7 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }:
   // Liens hors dropdown (points d'entrée externes + admin)
   // Le traducteur Mando'a est volontairement absent des clans : il n'existe que dans le hub.
   const extraLinks = [
-    ...(session ? [{ href: `${base}/recrutement`, label: "Recrutement" }] : []),
+    ...(loggedIn ? [{ href: `${base}/recrutement`, label: "Recrutement" }] : []),
   ];
 
   const visibleApp = effectivePerm > 0
@@ -79,7 +72,7 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }:
 
   return (
     <nav className="sticky top-0 z-50 border-b backdrop-blur-md"
-      style={{ borderColor: "var(--clan-primary, var(--beskar-600))", background: "rgba(16,16,22,0.95)" }}>
+      style={{ borderColor: "var(--clan-primary, var(--beskar-600))", background: "var(--clan-card, rgba(16,16,22,0.95))" }}>
       <div className="mx-auto flex max-w-[1200px] items-center justify-between px-4 sm:px-6" style={{ height: "60px" }}>
         <div className="flex items-center gap-3">
           <Link href="/clans" className="text-xs font-semibold uppercase tracking-[0.14em] transition-colors"
@@ -127,7 +120,7 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }:
           {isAdmin && <li><NavLink href={`${base}/admin`} label="Admin" /></li>}
 
           <li className="ml-2">
-            {session ? (
+            {loggedIn ? (
               <Link href={`${base}/profil`} className="relative flex items-center justify-center rounded-full transition-all"
                 style={{ width: "34px", height: "34px", background: "#1a1a1a", border: "1px solid var(--beskar-600)", color: "var(--beskar-300)" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--clan-primary, #c9a84c)"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--clan-primary, #c9a84c)"; }}
@@ -174,7 +167,7 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }:
             </>
           )}
           <div className="mt-3">
-            {session ? (
+            {loggedIn ? (
               <Link href={`${base}/profil`}
                 className="block w-full rounded-sm border px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em]"
                 style={{ fontFamily: "var(--font-display)", borderColor: "var(--beskar-500)", color: "var(--beskar-300)" }}

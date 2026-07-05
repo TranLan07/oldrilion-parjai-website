@@ -32,11 +32,25 @@ export async function PUT(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const { displayName, anonymous } = await req.json();
+  const { displayName, anonymous, publicSpecialization } = await req.json();
   const data: Record<string, unknown> = {};
   if (displayName !== undefined && displayName.trim()) data.displayName = displayName.trim();
   if (anonymous !== undefined) data.anonymous = Boolean(anonymous);
 
+  // Couverture publique : une spé publique (non-secrète) du clan de l'utilisateur.
+  if (publicSpecialization !== undefined) {
+    const me = await prisma.user.findUnique({ where: { id: session.user.id }, select: { clanId: true } });
+    if (!me?.clanId) return NextResponse.json({ error: "Vous n'appartenez à aucun clan." }, { status: 400 });
+    const value = String(publicSpecialization).trim();
+    if (value === "") {
+      data.publicSpecialization = "";
+    } else {
+      const spec = await prisma.specialization.findFirst({ where: { clanId: me.clanId, name: value, secret: false }, select: { id: true } });
+      if (!spec) return NextResponse.json({ error: "Spécialisation publique invalide." }, { status: 400 });
+      data.publicSpecialization = value;
+    }
+  }
+
   const user = await prisma.user.update({ where: { id: session.user.id }, data });
-  return NextResponse.json({ success: true, anonymous: user.anonymous });
+  return NextResponse.json({ success: true, anonymous: user.anonymous, publicSpecialization: user.publicSpecialization });
 }
