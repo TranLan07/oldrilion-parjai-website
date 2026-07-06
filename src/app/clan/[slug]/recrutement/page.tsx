@@ -9,7 +9,7 @@ type Spec = { id: string; name: string; description: string };
 type Field = { id: string; label: string; type: string; options: string[]; required: boolean; order: number };
 type Config = {
   clanName: string; colorBg: string; colorPrimary: string; colorAccent: string;
-  specializations: Spec[]; fields: Field[];
+  specializations: Spec[]; grades: string[]; fields: Field[];
 };
 
 export default function RecrutementPage() {
@@ -139,6 +139,20 @@ export default function RecrutementPage() {
                     </label>
                   ))}
                 </div>
+              )}
+              {/* Sélection parmi les spés publiques du clan */}
+              {f.type === "specialization" && (
+                <select required={f.required} value={answers[f.id] || ""} onChange={e => setAnswer(f.id, e.target.value)} className={inputClass} style={inputStyle}>
+                  <option value="">Choisir une spécialisation…</option>
+                  {config!.specializations.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                </select>
+              )}
+              {/* Sélection parmi les grades du clan */}
+              {f.type === "grade" && (
+                <select required={f.required} value={answers[f.id] || ""} onChange={e => setAnswer(f.id, e.target.value)} className={inputClass} style={inputStyle}>
+                  <option value="">Choisir un grade…</option>
+                  {config!.grades.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
               )}
             </Field>
           ))}

@@ -6,6 +6,7 @@ const { mockAuth, prismaMock } = vi.hoisted(() => ({
   prismaMock: {
     clan: { findUnique: vi.fn() },
     specialization: { findMany: vi.fn() },
+    grade: { findMany: vi.fn() },
     recruitmentField: { findMany: vi.fn(), deleteMany: vi.fn(), create: vi.fn() },
     recruitment: { create: vi.fn() },
     $transaction: vi.fn(async (ops: unknown) => ops),
@@ -27,6 +28,7 @@ beforeEach(() => {
   mockAuth.mockReset();
   Object.values(prismaMock).forEach(m => { if (typeof m !== "function") Object.values(m).forEach(fn => fn.mockReset()); });
   prismaMock.specialization.findMany.mockResolvedValue([{ id: "s1", name: "Kyramud", description: "" }]);
+  prismaMock.grade.findMany.mockResolvedValue([{ name: "Recrue" }, { name: "Exécuteur" }]);
   prismaMock.recruitmentField.findMany.mockResolvedValue([]);
   prismaMock.recruitment.create.mockImplementation(async (a: { data: object }) => ({ id: "r1", ...a.data }));
   prismaMock.$transaction.mockResolvedValue([]);
@@ -50,6 +52,13 @@ describe("GET public /recruitment — config", () => {
     prismaMock.clan.findUnique.mockResolvedValue({ id: "c1", slug: "parjai", suspended: false, premium: false });
     await pubGET(getReq, params());
     expect(prismaMock.recruitmentField.findMany).not.toHaveBeenCalled();
+  });
+
+  it("renvoie les grades du clan (pour les champs de type grade)", async () => {
+    prismaMock.clan.findUnique.mockResolvedValue({ id: "c1", slug: "parjai", suspended: false, premium: true });
+    const res = await pubGET(getReq, params());
+    const j = await res.json();
+    expect(j.grades).toEqual(["Recrue", "Exécuteur"]);
   });
 
   it("clan suspendu : 403", async () => {
@@ -125,5 +134,18 @@ describe("PUT admin /recruitment-fields — form builder", () => {
     // La création du 2e champ (radio) plafonne à 5 options
     const radioCreate = prismaMock.recruitmentField.create.mock.calls.find(c => c[0].data.type === "radio");
     expect(JSON.parse(radioCreate![0].data.options)).toHaveLength(5);
+  });
+
+  it("accepte les champs de type spécialisation et grade (sans options)", async () => {
+    prismaMock.clan.findUnique.mockResolvedValue({ id: "c1", slug: "parjai", suspended: false, premium: true });
+    prismaMock.recruitmentField.findMany.mockResolvedValue([]);
+    const res = await fieldsPUT(jsonReq("PUT", { fields: [
+      { label: "Spé visée", type: "specialization" },
+      { label: "Grade visé", type: "grade" },
+    ] }), params());
+    expect(res.status).toBe(200);
+    const types = prismaMock.recruitmentField.create.mock.calls.map(c => c[0].data.type);
+    expect(types).toContain("specialization");
+    expect(types).toContain("grade");
   });
 });

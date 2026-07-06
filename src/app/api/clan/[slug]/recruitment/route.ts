@@ -12,11 +12,18 @@ export async function GET(_: Request, { params }: P) {
   if (!clan) return notFound();
   if (clan.suspended) return suspendedResponse();
 
-  const specs = await prisma.specialization.findMany({
-    where: { clanId: clan.id, secret: false }, // jamais les spés secrètes
-    select: { id: true, name: true, description: true },
-    orderBy: { order: "asc" },
-  });
+  const [specs, grades] = await Promise.all([
+    prisma.specialization.findMany({
+      where: { clanId: clan.id, secret: false }, // jamais les spés secrètes
+      select: { id: true, name: true, description: true },
+      orderBy: { order: "asc" },
+    }),
+    prisma.grade.findMany({
+      where: { clanId: clan.id },
+      select: { name: true },
+      orderBy: { order: "asc" },
+    }),
+  ]);
 
   // Les champs custom ne sont actifs que pour les clans premium
   const fields = clan.premium
@@ -29,6 +36,7 @@ export async function GET(_: Request, { params }: P) {
     colorPrimary: clan.colorPrimary,
     colorAccent: clan.colorAccent,
     specializations: specs,
+    grades: grades.map(g => g.name),
     fields: fields.map(f => ({ id: f.id, label: f.label, type: f.type, options: safeJson(f.options), required: f.required, order: f.order })),
   });
 }

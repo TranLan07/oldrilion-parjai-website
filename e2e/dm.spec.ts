@@ -29,12 +29,13 @@ test.describe("Messagerie privée entre joueurs (depuis les contacts)", () => {
     await page.getByRole("button", { name: "Message" }).first().click();
     await page.waitForURL(/\/messagerie\?channel=/, { timeout: 10000 });
 
-    // Envoie un message dans la conversation privée
+    // Envoie un message unique (le canal est réutilisé entre les runs)
+    const dmMsg = `Contrat dispo ? ${Date.now()}`;
     const input = page.locator('input[type="text"]');
     await expect(input).toBeVisible({ timeout: 10000 });
-    await input.fill("Salut, dispo pour un contrat ?");
+    await input.fill(dmMsg);
     await page.getByRole("button", { name: /envoyer/i }).click();
-    await expect(page.getByText("Salut, dispo pour un contrat ?")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(dmMsg)).toBeVisible({ timeout: 10000 });
 
     // La discussion apparaît maintenant dans la liste des contacts
     await page.goto("/contacts", { waitUntil: "domcontentloaded" });

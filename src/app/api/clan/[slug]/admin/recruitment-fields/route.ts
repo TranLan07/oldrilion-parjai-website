@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 
 type P = { params: Promise<{ slug: string }> };
 
-const TYPES = ["text", "textarea", "checkbox", "radio"];
+// "specialization" / "grade" : listes auto-alimentées par les spés/grades du clan.
+const TYPES = ["text", "textarea", "checkbox", "radio", "specialization", "grade"];
 const MAX_FIELDS = 10;
 const MAX_OPTIONS = 5;
 

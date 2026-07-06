@@ -5,13 +5,16 @@ import HeroButtons from "./HeroButtons";
 export const metadata = { title: "Le Hub — Réseau Mandalorien" };
 
 export default async function HubHome() {
-  const clans = await prisma.clan.findMany({
-    include: {
-      tags: { include: { tag: true } },
-      _count: { select: { members: true } },
-    },
-    orderBy: { name: "asc" },
-  });
+  const [clans, missionCount] = await Promise.all([
+    prisma.clan.findMany({
+      include: {
+        tags: { include: { tag: true } },
+        _count: { select: { members: true } },
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.mission.count(),
+  ]);
 
   return (
     <div>
@@ -43,7 +46,7 @@ export default async function HubHome() {
           <div className="h-8 w-px" style={{ background: "#2a2a2a" }} />
           <Stat value={clans.reduce((a, c) => a + c._count.members, 0)} label="Membres" />
           <div className="h-8 w-px" style={{ background: "#2a2a2a" }} />
-          <Stat value="∞" label="Missions" />
+          <Stat value={missionCount} label="Missions" />
         </div>
       </section>
 

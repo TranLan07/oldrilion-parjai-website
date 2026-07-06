@@ -274,6 +274,8 @@ const FIELD_TYPES = [
   { v: "textarea", l: "Texte long" },
   { v: "radio", l: "Choix unique (radio)" },
   { v: "checkbox", l: "Choix multiple (cases)" },
+  { v: "specialization", l: "Spécialisation du clan" },
+  { v: "grade", l: "Grade du clan" },
 ];
 
 // Form builder des champs custom du recrutement (premium, max 10 champs).
@@ -336,7 +338,11 @@ function RecruitmentFieldsBuilder({ slug, premium }: { slug: string; premium: bo
               <div className="flex flex-wrap items-center gap-2">
                 <input value={f.label} onChange={e => update(i, { label: e.target.value })} placeholder="Intitulé du champ"
                   className={`flex-1 min-w-[160px] ${inp}`} />
-                <select value={f.type} onChange={e => update(i, { type: e.target.value, options: (e.target.value === "radio" || e.target.value === "checkbox") && f.options.length === 0 ? [""] : f.options })} className={inp} style={{ width: "auto" }}>
+                <select value={f.type} onChange={e => {
+                  const t = e.target.value;
+                  const needsOptions = t === "radio" || t === "checkbox";
+                  update(i, { type: t, options: needsOptions ? (f.options.length === 0 ? [""] : f.options) : [] });
+                }} className={inp} style={{ width: "auto" }}>
                   {FIELD_TYPES.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
                 </select>
                 <label className="flex items-center gap-1.5 text-xs" style={{ color: "var(--beskar-300)" }}>
