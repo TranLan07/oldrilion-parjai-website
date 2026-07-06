@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 type ContactTarget = {
@@ -9,10 +10,18 @@ type ContactTarget = {
   clan: { name: string; slug: string; colorPrimary: string } | null;
 };
 type Contact = { id: string; nickname: string; target: ContactTarget };
+type Conversation = {
+  channelId: string;
+  other: { id: string; displayName: string; publicId: string; clan: { name: string; colorPrimary: string } | null } | null;
+  lastMessage: { content: string; createdAt: string } | null;
+  messageCount: number;
+};
 
 export default function ContactsPage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [publicIdInput, setPublicIdInput] = useState("");
   const [nicknameInput, setNicknameInput] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
@@ -23,12 +32,24 @@ export default function ContactsPage() {
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(""), 3000); }
 
   useEffect(() => {
-    if (session?.user?.id) load();
+    if (session?.user?.id) { load(); loadConversations(); }
   }, [session]);
 
   async function load() {
     const r = await fetch("/api/contacts");
     if (r.ok) setContacts(await r.json());
+  }
+
+  async function loadConversations() {
+    const r = await fetch("/api/dm");
+    if (r.ok) setConversations(await r.json());
+  }
+
+  async function openDm(targetId: string) {
+    const r = await fetch("/api/dm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ targetId }) });
+    const d = await r.json();
+    if (r.ok) router.push(`/messagerie?channel=${d.channelId}`);
+    else flash(d.error || "Impossible d'ouvrir la conversation");
   }
 
   async function addContact() {
@@ -79,9 +100,44 @@ export default function ContactsPage() {
       </Link>
       <p className="mb-1 text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: "#4a4a4a" }}>Hub</p>
       <h1 className="mb-8 text-4xl font-bold uppercase tracking-[0.14em]"
-        style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>Carnet de contacts</h1>
+        style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>Contacts &amp; messages</h1>
 
       {msg && <div className="mb-6 rounded-sm border px-4 py-3 text-sm" style={{ borderColor: "#2a2a2a", background: "#111", color: "#9ca3af" }}>{msg}</div>}
+
+      {/* Conversations privées */}
+      <section className="mb-8">
+        <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: "#4a4a4a" }}>Discussions</h2>
+        {conversations.length === 0 ? (
+          <p className="rounded-sm border px-4 py-6 text-center text-sm" style={{ borderColor: "#1a1a1a", background: "#0d0d0d", color: "#4a4a4a" }}>
+            Aucune discussion. Écrivez à un contact via le bouton « Message ».
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {conversations.map(cv => (
+              <button key={cv.channelId} onClick={() => router.push(`/messagerie?channel=${cv.channelId}`)}
+                className="flex w-full items-center gap-4 rounded-sm border p-4 text-left transition-colors"
+                style={{ borderColor: "#1a1a1a", background: "#0d0d0d" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "#2a2a2a"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "#1a1a1a"; }}>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold flex-shrink-0"
+                  style={{ background: "#1a1a1a", color: "#f2f2f5", border: "1px solid #2a2a2a" }}>
+                  {(cv.other?.displayName ?? "?").charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm truncate" style={{ color: "#f2f2f5" }}>{cv.other?.displayName ?? "Inconnu"}</p>
+                    {cv.other?.clan && <span className="text-xs" style={{ color: cv.other.clan.colorPrimary }}>{cv.other.clan.name}</span>}
+                  </div>
+                  <p className="text-xs truncate" style={{ color: "#6b7280" }}>{cv.lastMessage?.content || "Nouvelle conversation"}</p>
+                </div>
+                <span className="text-xs flex-shrink-0" style={{ color: "#3a3a3a" }}>
+                  {cv.lastMessage ? new Date(cv.lastMessage.createdAt).toLocaleDateString("fr-FR") : ""}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Ajouter un contact */}
       <section className="mb-8 rounded-sm border p-6" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
@@ -146,6 +202,10 @@ export default function ContactsPage() {
                     </>
                   ) : (
                     <>
+                      <button onClick={() => openDm(c.target.id)}
+                        className="text-xs px-3 py-1 rounded-sm font-semibold" style={{ background: "#c9a84c", color: "#1a1408" }}>
+                        Message
+                      </button>
                       <button onClick={() => { setEditId(c.id); setEditNick(c.nickname); }}
                         className="text-xs px-2 py-1 rounded-sm border" style={{ borderColor: "#2a2a2a", color: "#6b7280" }}>
                         {c.nickname ? "Surnom" : "Renommer"}
