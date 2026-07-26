@@ -14,13 +14,20 @@ export async function GET(_: Request, { params }: P) {
   if (!clan) return notFound();
   if (clan.suspended) return suspendedResponse();
 
+  // Un admin hub peut consulter (et modérer) la messagerie de n'importe quel clan,
+  // même s'il n'y est pas membre — y compris les canaux privés.
+  const hubRole = (session as unknown as Record<string, unknown>).hubRole as string;
+  const isHubAdmin = hubRole === "admin";
+
   const channels = await prisma.channel.findMany({
     where: {
       clanId: clan.id,
-      OR: [
-        { isPrivate: false },
-        { members: { some: { userId: session.user.id } } },
-      ],
+      ...(isHubAdmin ? {} : {
+        OR: [
+          { isPrivate: false },
+          { members: { some: { userId: session.user.id } } },
+        ],
+      }),
     },
     include: {
       members: { select: { muted: true, user: { select: { id: true, displayName: true } } } },

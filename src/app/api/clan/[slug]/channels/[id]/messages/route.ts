@@ -30,8 +30,10 @@ export async function GET(_req: NextRequest, { params }: P) {
     if (!channel || channel.clanId !== clan.id) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
     if (await channelMasked(clan.id, id, clan.premium)) return NextResponse.json({ error: "Canal réservé aux clans premium" }, { status: 403 });
 
+    const hubRole = (session as unknown as Record<string, unknown>).hubRole as string;
+    const isHubAdmin = hubRole === "admin";
     const isMember = channel.members.some(m => m.userId === session.user!.id);
-    if (channel.isPrivate && !isMember) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+    if (channel.isPrivate && !isMember && !isHubAdmin) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
 
     if (!channel.isPrivate && !isMember) {
       await prisma.channelMember.create({ data: { userId: session.user!.id, channelId: id } });
@@ -73,9 +75,12 @@ export async function POST(req: NextRequest, { params }: P) {
     if (!channel || channel.clanId !== clan.id) return NextResponse.json({ error: "Canal introuvable" }, { status: 404 });
     if (await channelMasked(clan.id, id, clan.premium)) return NextResponse.json({ error: "Canal réservé aux clans premium" }, { status: 403 });
 
+    const hubRole = (session as unknown as Record<string, unknown>).hubRole as string;
+    const isHubAdmin = hubRole === "admin";
     const membership = await prisma.channelMember.findUnique({
       where: { userId_channelId: { userId: session.user.id, channelId: id } },
     });
+    if (channel.isPrivate && !membership && !isHubAdmin) return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     if (membership?.muted) return NextResponse.json({ error: "Vous êtes muté sur ce canal" }, { status: 403 });
 
     if (!channel.isPrivate && !membership) {

@@ -21,8 +21,10 @@ export async function GET(_req: NextRequest, { params }: P) {
   const channel = await prisma.channel.findUnique({ where: { id }, include: { members: true } });
   if (!channel || channel.clanId !== clan.id) return new Response("Canal introuvable", { status: 404 });
 
+  const hubRole = (session as unknown as Record<string, unknown>).hubRole as string;
+  const isHubAdmin = hubRole === "admin";
   const isMember = channel.members.some(m => m.userId === session.user!.id);
-  if (channel.isPrivate && !isMember) return new Response("Acces refuse", { status: 403 });
+  if (channel.isPrivate && !isMember && !isHubAdmin) return new Response("Acces refuse", { status: 403 });
 
   const userRecord = await prisma.user.findUnique({ where: { id: session.user.id }, select: { mandalorien: true } });
   const isMandalorien = userRecord?.mandalorien ?? false;

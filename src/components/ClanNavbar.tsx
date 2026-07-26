@@ -39,7 +39,7 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }:
 
   // Liens dans le dropdown "App" (fonctionnalités actives, membres connectés)
   const appLinks = [
-    { href: "/messagerie?tab=clan", label: "Messages", minPerm: 1 },
+    { href: `/messagerie?tab=clan&clan=${slug}`, label: "Messages", minPerm: 1 },
     { href: `${base}/missions`, label: "Missions", minPerm: 1 },
     { href: `${base}/evenements`, label: "Événements", minPerm: 1 },
     { href: `${base}/banque`, label: "Banque", minPerm: 1 },

@@ -38,7 +38,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "all", label: "Tous" },
   { key: "public", label: "Public" },
   { key: "clan", label: "Clan" },
-  { key: "dm", label: "Message privé" },
+  { key: "dm", label: "Privé" },
 ];
 
 function matchesTab(tab: Tab, kind: Kind): boolean {
@@ -57,9 +57,13 @@ export default function MessageriePage() {
   const permissionLevel = (s?.permissionLevel as number) ?? 0;
   const isMandalorien = (s?.mandalorien as boolean) || false;
   const isHubAdmin = hubRole === "admin" || hubRole === "moderator";
+  // Bypass cross-clan (accès à la messagerie d'un clan qui n'est pas le sien) : réservé
+  // au rôle hub "admin" strict, à l'image de requireClanAdmin() côté API — pas les modérateurs.
+  const isStrictHubAdmin = hubRole === "admin";
   const isClanAdmin = Boolean(clanSlug) && permissionLevel >= 10;
 
   const [tab, setTab] = useState<Tab>("all");
+  const [queryClanSlug, setQueryClanSlug] = useState<string | null>(null);
   const [hubChannels, setHubChannels] = useState<HubChannelRaw[]>([]);
   const [clanChannels, setClanChannels] = useState<ClanChannelRaw[]>([]);
   const [hubLoaded, setHubLoaded] = useState(false);
@@ -90,12 +94,19 @@ export default function MessageriePage() {
   const firstLoad = useRef(true);
   const sseRef = useRef<EventSource | null>(null);
 
-  // Lecture de ?tab= et ?channel= au montage (pas de useSearchParams pour éviter le Suspense boundary).
+  // Lecture de ?tab=, ?channel= et ?clan= au montage (pas de useSearchParams pour éviter le Suspense boundary).
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     const t = sp.get("tab");
     if (t === "all" || t === "public" || t === "clan" || t === "dm") setTab(t);
+    setQueryClanSlug(sp.get("clan"));
   }, []);
+
+  // Clan cible de l'onglet "Clan" : celui demandé en query (ex: lien "Messages" depuis la
+  // page d'un clan) si l'utilisateur est admin hub — sinon toujours son propre clan.
+  const targetClanSlug = (queryClanSlug && (isStrictHubAdmin || queryClanSlug === clanSlug)) ? queryClanSlug : clanSlug;
+  const viewingForeignClan = Boolean(targetClanSlug) && targetClanSlug !== clanSlug;
+  const canManageClan = isStrictHubAdmin || (!viewingForeignClan && isClanAdmin);
 
   const loadHubChannels = useCallback(async () => {
     const r = await fetch("/api/hub/channels");
@@ -104,27 +115,27 @@ export default function MessageriePage() {
   }, []);
 
   const loadClanChannels = useCallback(async () => {
-    if (!clanSlug) { setClanLoaded(true); return; }
-    const r = await fetch(`/api/clan/${clanSlug}/channels`);
-    if (r.ok) setClanChannels(await r.json());
+    if (!targetClanSlug) { setClanLoaded(true); return; }
+    const r = await fetch(`/api/clan/${targetClanSlug}/channels`);
+    if (r.ok) setClanChannels(await r.json()); else setClanChannels([]);
     setClanLoaded(true);
-  }, [clanSlug]);
+  }, [targetClanSlug]);
 
   useEffect(() => {
     if (!session) return;
     loadHubChannels();
     loadClanChannels();
     fetch("/api/hub/clans").then(r => r.ok ? r.json() : []).then(setAllClans);
-    if (clanSlug) {
-      fetch(`/api/clan/${clanSlug}/public`).then(r => r.ok ? r.json() : null).then(d => { if (d) setClanTheme(d); });
+    if (targetClanSlug) {
+      fetch(`/api/clan/${targetClanSlug}/public`).then(r => r.ok ? r.json() : null).then(d => { if (d) setClanTheme(d); });
     }
-  }, [session, loadHubChannels, loadClanChannels, clanSlug]);
+  }, [session, loadHubChannels, loadClanChannels, targetClanSlug]);
 
   useEffect(() => {
-    if ((isClanAdmin || isHubAdmin) && clanSlug && allClanUsers.length === 0) {
-      fetch(`/api/clan/${clanSlug}/admin/users`).then(r => r.ok ? r.json() : []).then(setAllClanUsers);
+    if (canManageClan && targetClanSlug && allClanUsers.length === 0) {
+      fetch(`/api/clan/${targetClanSlug}/admin/users`).then(r => r.ok ? r.json() : []).then(setAllClanUsers);
     }
-  }, [isClanAdmin, isHubAdmin, clanSlug, allClanUsers.length]);
+  }, [canManageClan, targetClanSlug, allClanUsers.length]);
 
   // Liste fusionnée hub + clan, chaque canal étiqueté par portée (scope) et nature (kind).
   const channels: Channel[] = useMemo(() => {
@@ -159,8 +170,8 @@ export default function MessageriePage() {
   const activeChannel = useMemo(() => channels.find(c => c.id === activeId) ?? null, [channels, activeId]);
 
   const apiBase = useCallback((ch: Channel) => (
-    ch.scope === "clan" ? `/api/clan/${clanSlug}/channels/${ch.id}` : `/api/hub/channels/${ch.id}`
-  ), [clanSlug]);
+    ch.scope === "clan" ? `/api/clan/${targetClanSlug}/channels/${ch.id}` : `/api/hub/channels/${ch.id}`
+  ), [targetClanSlug]);
 
   useEffect(() => {
     if (!activeChannel || !session) return;
@@ -221,8 +232,8 @@ export default function MessageriePage() {
   }
 
   async function createClanChannel() {
-    if (!createName.trim() || !clanSlug) return;
-    await fetch(`/api/clan/${clanSlug}/admin/channels`, {
+    if (!createName.trim() || !targetClanSlug) return;
+    await fetch(`/api/clan/${targetClanSlug}/admin/channels`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: createName.trim(), description: createDesc.trim(), isPrivate: false }),
     });
@@ -234,7 +245,7 @@ export default function MessageriePage() {
   async function deleteActiveChannel() {
     if (!activeChannel) return;
     if (activeChannel.scope === "clan") {
-      await fetch(`/api/clan/${clanSlug}/admin/channels`, {
+      await fetch(`/api/clan/${targetClanSlug}/admin/channels`, {
         method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: activeChannel.id }),
       });
     } else {
@@ -252,7 +263,7 @@ export default function MessageriePage() {
 
   async function memberAction(action: string, userId: string) {
     if (!activeChannel || activeChannel.scope !== "clan") return;
-    await fetch(`/api/clan/${clanSlug}/channels/${activeChannel.id}/members`, {
+    await fetch(`/api/clan/${targetClanSlug}/channels/${activeChannel.id}/members`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, userId }),
     });
     loadClanChannels();
@@ -260,7 +271,7 @@ export default function MessageriePage() {
 
   async function updateSettings(data: object) {
     if (!activeChannel || activeChannel.scope !== "clan") return;
-    await fetch(`/api/clan/${clanSlug}/channels/${activeChannel.id}/settings`, {
+    await fetch(`/api/clan/${targetClanSlug}/channels/${activeChannel.id}/settings`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
     });
     loadClanChannels();
@@ -268,7 +279,7 @@ export default function MessageriePage() {
 
   async function followChannel() {
     if (!activeChannel || activeChannel.scope !== "clan" || !followEmail.includes("@")) return;
-    const res = await fetch(`/api/clan/${clanSlug}/channels/${activeChannel.id}/follow`, {
+    const res = await fetch(`/api/clan/${targetClanSlug}/channels/${activeChannel.id}/follow`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: followEmail }),
     });
     const data = await res.json();
@@ -278,7 +289,7 @@ export default function MessageriePage() {
 
   async function unfollowChannel() {
     if (!activeChannel || activeChannel.scope !== "clan") return;
-    await fetch(`/api/clan/${clanSlug}/channels/${activeChannel.id}/follow`, { method: "DELETE" });
+    await fetch(`/api/clan/${targetClanSlug}/channels/${activeChannel.id}/follow`, { method: "DELETE" });
     setFollowMsg("Suivi annulé");
   }
 
@@ -287,9 +298,9 @@ export default function MessageriePage() {
   );
 
   const isMuted = activeChannel?.members.some(m => m.user.id === meId && m.muted);
-  const canManageActive = Boolean(activeChannel) && (activeChannel!.scope === "clan" ? (isClanAdmin || isHubAdmin) : isHubAdmin);
+  const canManageActive = Boolean(activeChannel) && (activeChannel!.scope === "clan" ? canManageClan : isHubAdmin);
   const canCreateHub = isHubAdmin || isClanAdmin;
-  const canCreateClan = Boolean(clanSlug) && (isClanAdmin || isHubAdmin);
+  const canCreateClan = Boolean(targetClanSlug) && canManageClan;
   const showCreateButton = tab === "clan" ? canCreateClan : tab === "public" ? canCreateHub : false;
 
   const hubAccessClans = (ch: Channel) => {
@@ -314,7 +325,7 @@ export default function MessageriePage() {
     ? [
         { label: "Clan", items: channels.filter(c => c.kind === "clan") },
         { label: "Public", items: channels.filter(c => c.kind === "public" || c.kind === "diplo") },
-        { label: "Message privé", items: channels.filter(c => c.kind === "dm") },
+        { label: "Privé", items: channels.filter(c => c.kind === "dm") },
       ].filter(g => g.items.length > 0)
     : [{ label: null, items: channels.filter(c => matchesTab(tab, c.kind)) }];
 
@@ -341,7 +352,7 @@ export default function MessageriePage() {
 
         {/* Onglets */}
         <div className="flex border-b" style={{ borderColor: "#1a1a1a" }}>
-          {TABS.filter(t => t.key !== "clan" || clanSlug).map(t => (
+          {TABS.filter(t => t.key !== "clan" || targetClanSlug).map(t => (
             <button key={t.key} onClick={() => selectTab(t.key)}
               className="flex-1 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors"
               style={{ color: tab === t.key ? accent : "#3a3a3a", borderBottom: tab === t.key ? `1px solid ${accent}` : "1px solid transparent" }}>
@@ -403,7 +414,7 @@ export default function MessageriePage() {
         <div className="flex-1 overflow-y-auto">
           {grouped.every(g => g.items.length === 0) && (
             <p className="px-4 py-6 text-xs" style={{ color: "#3a3a3a" }}>
-              {tab === "dm" ? "Aucune conversation privée. Ouvrez-en une depuis vos Contacts." : tab === "clan" && !clanSlug ? "Vous n'appartenez à aucun clan." : "Aucun canal."}
+              {tab === "dm" ? "Aucune conversation privée. Ouvrez-en une depuis vos Contacts." : tab === "clan" && !targetClanSlug ? "Vous n'appartenez à aucun clan." : "Aucun canal."}
             </p>
           )}
           {grouped.map((group, gi) => (
@@ -429,7 +440,12 @@ export default function MessageriePage() {
       </aside>
 
       {/* Zone centrale */}
-      <div className={`${!activeId ? "hidden md:flex" : "flex"} flex-1 flex-col`} style={{ background: "#0a0a0a" }}>
+      <div className={`${!activeId ? "hidden md:flex" : "flex"} min-w-0 flex-1 flex-col`} style={{ background: "#0a0a0a" }}>
+        {viewingForeignClan && tab === "clan" && (
+          <div className="px-4 py-1.5 text-center text-xs font-semibold" style={{ background: "rgba(201,168,76,0.1)", color: accent }}>
+            ⚙ Vous consultez la messagerie de {clanTheme?.name ?? "ce clan"} en tant qu&apos;administrateur hub — ce n&apos;est pas votre clan.
+          </div>
+        )}
         <div className="flex items-center justify-between border-b px-4 py-2.5" style={{ borderColor: "#1a1a1a" }}>
           {activeChannel ? (
             <div className="flex items-center gap-3 min-w-0">
@@ -585,7 +601,7 @@ export default function MessageriePage() {
                 )}
                 <input type="text" value={newMsg} onChange={e => setNewMsg(e.target.value)}
                   placeholder={mandoaMode ? "Message en Mando'a..." : `Message ${channelLabel(activeChannel!).icon} ${channelLabel(activeChannel!).text}...`}
-                  className="flex-1 rounded border px-4 py-2 text-sm outline-none"
+                  className="min-w-0 flex-1 rounded border px-4 py-2 text-sm outline-none"
                   style={{ background: "#111", borderColor: mandoaMode ? `${accent}40` : "#2a2a2a", color: "#f2f2f5" }}
                   disabled={sending} />
                 <button type="submit" disabled={sending || !newMsg.trim()}
