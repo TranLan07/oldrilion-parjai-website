@@ -39,7 +39,7 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }:
 
   // Liens dans le dropdown "App" (fonctionnalités actives, membres connectés)
   const appLinks = [
-    { href: `${base}/messagerie`, label: "Messages", minPerm: 1 },
+    { href: "/messagerie?tab=clan", label: "Messages", minPerm: 1 },
     { href: `${base}/missions`, label: "Missions", minPerm: 1 },
     { href: `${base}/evenements`, label: "Événements", minPerm: 1 },
     { href: `${base}/banque`, label: "Banque", minPerm: 1 },
@@ -57,10 +57,12 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }:
     ? appLinks.filter(l => effectivePerm >= l.minPerm)
     : [];
 
-  const appActive = appLinks.some(l => pathname === l.href);
+  // href peut porter une query string (ex: "/messagerie?tab=clan") — usePathname() ne la retourne jamais.
+  const hrefPath = (href: string) => href.split("?")[0];
+  const appActive = appLinks.some(l => pathname === hrefPath(l.href));
 
   function NavLink({ href, label }: { href: string; label: string }) {
-    const active = pathname === href;
+    const active = pathname === hrefPath(href);
     return (
       <Link href={href} className={linkStyle}
         style={{ fontFamily: "var(--font-display)", color: active ? "var(--clan-primary, var(--gold-500))" : "var(--beskar-200)" }}
@@ -105,9 +107,9 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }:
                   {visibleApp.map(l => (
                     <Link key={l.href} href={l.href}
                       className="block px-4 py-2 text-sm font-semibold uppercase tracking-[0.1em] transition-colors"
-                      style={{ fontFamily: "var(--font-display)", color: pathname === l.href ? "var(--clan-primary, var(--gold-500))" : "var(--beskar-200)" }}
+                      style={{ fontFamily: "var(--font-display)", color: pathname === hrefPath(l.href) ? "var(--clan-primary, var(--gold-500))" : "var(--beskar-200)" }}
                       onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "var(--clan-primary, var(--gold-400))"; (e.currentTarget as HTMLAnchorElement).style.background = "rgba(255,255,255,0.03)"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = pathname === l.href ? "var(--clan-primary, var(--gold-500))" : "var(--beskar-200)"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}>
+                      onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = pathname === hrefPath(l.href) ? "var(--clan-primary, var(--gold-500))" : "var(--beskar-200)"; (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; }}>
                       {l.label}
                     </Link>
                   ))}

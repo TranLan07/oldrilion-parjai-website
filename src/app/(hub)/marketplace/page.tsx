@@ -52,7 +52,7 @@ export default function MarketplacePage() {
     const r = await fetch(`/api/hub/marketplace/${listing.id}/contact`, { method: "POST" });
     if (r.ok) {
       const data = await r.json();
-      router.push(`/messagerie?channel=${data.channelId}`);
+      router.push(`/messagerie?tab=dm&channel=${data.channelId}`);
     }
   }
 

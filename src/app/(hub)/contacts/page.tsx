@@ -48,7 +48,7 @@ export default function ContactsPage() {
   async function openDm(targetId: string) {
     const r = await fetch("/api/dm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ targetId }) });
     const d = await r.json();
-    if (r.ok) router.push(`/messagerie?channel=${d.channelId}`);
+    if (r.ok) router.push(`/messagerie?tab=dm&channel=${d.channelId}`);
     else flash(d.error || "Impossible d'ouvrir la conversation");
   }
 
@@ -114,7 +114,7 @@ export default function ContactsPage() {
         ) : (
           <div className="space-y-2">
             {conversations.map(cv => (
-              <button key={cv.channelId} onClick={() => router.push(`/messagerie?channel=${cv.channelId}`)}
+              <button key={cv.channelId} onClick={() => router.push(`/messagerie?tab=dm&channel=${cv.channelId}`)}
                 className="flex w-full items-center gap-4 rounded-sm border p-4 text-left transition-colors"
                 style={{ borderColor: "#1a1a1a", background: "#0d0d0d" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = "#2a2a2a"; }}
