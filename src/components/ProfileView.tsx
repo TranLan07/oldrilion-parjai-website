@@ -323,7 +323,7 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
                 {(["public", "clan", "private"] as Visibility[]).map(v => <option key={v} value={v}>{visLabels[v]}</option>)}
               </select>
             </div>
-            {profile.specializationSecret && (
+            {profile.publicSpecialization && (
               <label className="mt-2 flex items-center gap-2 text-xs cursor-pointer" style={{ color: "#9ca3af" }}>
                 <input type="checkbox" checked={showRealSpec} onChange={e => setShowRealSpec(e.target.checked)} />
                 Afficher ma vraie spécialisation sur le profil public (sinon, la couverture publique est affichée)

@@ -3,10 +3,14 @@ import { prisma } from "@/lib/prisma";
 import HeroButtons from "./HeroButtons";
 
 export const metadata = { title: "Le Hub — Réseau Mandalorien" };
+// Page rendue à chaque requête : sans cette directive, Next.js peut la pré-rendre
+// statiquement au build et ne plus jamais refléter les clans supprimés/suspendus ensuite.
+export const dynamic = "force-dynamic";
 
 export default async function HubHome() {
   const [clans, missionCount] = await Promise.all([
     prisma.clan.findMany({
+      where: { suspended: false },
       include: {
         tags: { include: { tag: true } },
         _count: { select: { members: true } },

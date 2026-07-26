@@ -65,8 +65,12 @@ export async function GET(_: Request, { params }: P) {
   let clanInfo = null;
   if (target.clan && visible(target.profileVisClanInfo)) {
     const secret = target.specializationRef?.secret ?? false;
-    const specialization = secret && !bypass && !target.profileShowRealSpec
-      ? (target.publicSpecialization || "Spécialité classifiée")
+    // La couverture s'affiche dès qu'elle est configurée (publicSpecialization non vide),
+    // pas seulement quand la spécialisation est marquée "secrète" — cohérent avec le
+    // reste du site (le trombinoscope l'utilise déjà indépendamment de ce flag).
+    const hasCover = Boolean(target.publicSpecialization && target.publicSpecialization.trim());
+    const specialization = hasCover && !bypass && !target.profileShowRealSpec
+      ? target.publicSpecialization
       : (target.specialization || "—");
     clanInfo = {
       clan: { slug: target.clan.slug, name: target.clan.name, colorBg: target.clan.colorBg, colorPrimary: target.clan.colorPrimary, colorAccent: target.clan.colorAccent },
