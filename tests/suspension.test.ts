@@ -43,6 +43,8 @@ import * as adminPages from "../src/app/api/clan/[slug]/admin/pages/route";
 import * as adminRecruitment from "../src/app/api/clan/[slug]/admin/recruitment/route";
 import * as adminRecruitmentFields from "../src/app/api/clan/[slug]/admin/recruitment-fields/route";
 import * as recruitmentPublic from "../src/app/api/clan/[slug]/recruitment/route";
+import * as adminValues from "../src/app/api/clan/[slug]/admin/values/route";
+import * as valuesPublic from "../src/app/api/clan/[slug]/values/route";
 import * as adminRules from "../src/app/api/clan/[slug]/admin/rules/route";
 import * as adminSettings from "../src/app/api/clan/[slug]/admin/settings/route";
 import * as adminSpecs from "../src/app/api/clan/[slug]/admin/specializations/route";
@@ -85,6 +87,8 @@ const ROUTES: Array<{ name: string; mod: Handlers; methods: string[]; hasId?: bo
   { name: "admin/recruitment", mod: adminRecruitment, methods: ["GET", "PUT"] },
   { name: "admin/recruitment-fields", mod: adminRecruitmentFields, methods: ["GET", "PUT"] },
   { name: "recruitment (public)", mod: recruitmentPublic, methods: ["GET", "POST"] },
+  { name: "admin/values", mod: adminValues, methods: ["GET", "PUT"] },
+  { name: "values (public)", mod: valuesPublic, methods: ["GET"] },
   { name: "admin/rules", mod: adminRules, methods: ["GET", "POST", "PUT", "DELETE"] },
   { name: "admin/settings", mod: adminSettings, methods: ["GET", "PUT"] },
   { name: "admin/specializations", mod: adminSpecs, methods: ["GET", "POST", "PUT", "DELETE"] },

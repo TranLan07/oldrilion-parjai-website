@@ -8,24 +8,49 @@ type Tag = { id: string; name: string; _count: { clans: number } };
 type User = { id: string; publicId: string; username: string; displayName: string; hubRole: string; role: string; permissionLevel: number; mandalorien: boolean; clanId: string | null; clan: { name: string; slug: string } | null; createdAt: string };
 type Config = Record<string, string>;
 
-const tabs = ["Clans", "Utilisateurs", "Tags", "Config", "Contacts", "Messagerie", "Missions", "Événements", "Dictionnaire"] as const;
+// Regroupement des onglets par catégorie — même logique de navigation que l'admin de clan.
+const categories: { label: string; icon: string; items: string[] }[] = [
+  { label: "Réseau", icon: "🌐", items: ["Clans", "Tags"] },
+  { label: "Utilisateurs", icon: "👤", items: ["Utilisateurs"] },
+  { label: "Support", icon: "✉️", items: ["Contacts"] },
+  { label: "Activité inter-clans", icon: "💬", items: ["Messagerie", "Missions", "Événements"] },
+  { label: "Système", icon: "⚙️", items: ["Config", "Dictionnaire"] },
+];
+const tabs = ["Vue d'ensemble", ...categories.flatMap(c => c.items)] as const;
 type Tab = typeof tabs[number];
+
+function navStyle(active: boolean) {
+  return { color: active ? "#000" : "#9ca3af", background: active ? "#f2f2f5" : "transparent" };
+}
+
+function StatCard({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <div className="rounded-sm border p-4" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
+      <div className="text-2xl font-bold" style={{ color: accent ? "#c9a84c" : "#f2f2f5" }}>{value}</div>
+      <div className="mt-1 text-xs uppercase tracking-wider" style={{ color: "#4a4a4a" }}>{label}</div>
+    </div>
+  );
+}
 
 export default function HubAdminPage() {
   const { data: session } = useSession();
   const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string;
 
   type ContactMsg = { id: string; name: string; email: string; type: string; subject: string; message: string; read: boolean; createdAt: string };
+  type ClanRequest = { id: string; category: string; subject: string; message: string; status: string; createdAt: string; clan: { name: string; slug: string; colorPrimary: string }; author: { displayName: string; username: string } };
   type HubChannel = { id: string; name: string; description: string; _count: { messages: number }; members: { user: { id: string; displayName: string } }[] };
   type HubMission = { id: string; title: string; description: string; status: string; maxParticipants: number; createdAt: string; clan: { name: string; slug: string; colorPrimary: string } | null };
   type HubEvent = { id: string; title: string; description: string; status: string; hubStatus: string; startAt: string | null; _count: { members: number }; clan: { name: string; slug: string; colorPrimary: string } | null };
 
-  const [tab, setTab] = useState<Tab>("Clans");
+  const [tab, setTab] = useState<Tab>("Vue d'ensemble");
   const [clans, setClans] = useState<Clan[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [config, setConfig] = useState<Config>({});
   const [contacts, setContacts] = useState<ContactMsg[]>([]);
+  const [clanRequests, setClanRequests] = useState<ClanRequest[]>([]);
+  const [openClanRequest, setOpenClanRequest] = useState<string | null>(null);
+  const [clanRequestFilter, setClanRequestFilter] = useState<"all" | "pending">("pending");
   const [newClanName, setNewClanName] = useState("");
   const [newTagName, setNewTagName] = useState("");
   const [userSearch, setUserSearch] = useState("");
@@ -63,6 +88,22 @@ export default function HubAdminPage() {
     if (r.ok) setContacts(await r.json());
   }
 
+  async function loadClanRequests() {
+    const r = await fetch("/api/hub/admin/clan-requests");
+    if (r.ok) setClanRequests(await r.json());
+  }
+
+  async function setClanRequestStatus(id: string, status: string) {
+    await fetch("/api/hub/admin/clan-requests", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
+    setClanRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+  }
+
+  async function deleteClanRequest(id: string) {
+    await fetch("/api/hub/admin/clan-requests", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    setClanRequests(prev => prev.filter(r => r.id !== id));
+    if (openClanRequest === id) setOpenClanRequest(null);
+  }
+
   async function loadHubChannels() {
     const r = await fetch("/api/hub/channels");
     if (r.ok) setHubChannels(await r.json());
@@ -82,7 +123,7 @@ export default function HubAdminPage() {
     if (r.ok) setDictEntries(await r.json());
   }
 
-  useEffect(() => { loadClans(); loadTags(); loadUsers(); loadConfig(); loadContacts(); loadHubChannels(); loadHubMissions(); loadHubEvents(); loadDict(); }, []);
+  useEffect(() => { loadClans(); loadTags(); loadUsers(); loadConfig(); loadContacts(); loadClanRequests(); loadHubChannels(); loadHubMissions(); loadHubEvents(); loadDict(); }, []);
 
   async function loadClans() {
     const r = await fetch("/api/hub/admin/clans");
@@ -250,15 +291,73 @@ export default function HubAdminPage() {
 
       {msg && <div className="mb-6 rounded-sm border px-4 py-3 text-sm" style={{ borderColor: "#2a2a2a", background: "#111", color: "#9ca3af" }}>{msg}</div>}
 
-      {/* Tabs */}
-      <div className="mb-8 flex gap-1 overflow-x-auto border-b" style={{ borderColor: "#1a1a1a" }}>
-        {tabs.map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className="px-5 py-2.5 text-sm font-semibold uppercase tracking-[0.1em] transition-colors"
-            style={{ fontFamily: "var(--font-display)", color: tab === t ? "#f2f2f5" : "#4a4a4a", borderBottom: tab === t ? "2px solid #f2f2f5" : "2px solid transparent" }}
-          >{t}</button>
-        ))}
+      {/* Nav mobile */}
+      <div className="mb-5 lg:hidden">
+        <select value={tab} onChange={e => setTab(e.target.value as Tab)}
+          className="w-full rounded-sm border px-3 py-2 text-sm outline-none" style={inputStyle}>
+          <option value="Vue d'ensemble">🏠 Vue d&apos;ensemble</option>
+          {categories.map(cat => (
+            <optgroup key={cat.label} label={`${cat.icon} ${cat.label}`}>
+              {cat.items.map(item => <option key={item} value={item}>{item}</option>)}
+            </optgroup>
+          ))}
+        </select>
       </div>
+
+      <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
+        {/* Nav desktop */}
+        <nav className="hidden lg:block">
+          <button onClick={() => setTab("Vue d'ensemble")} style={navStyle(tab === "Vue d'ensemble")}
+            className="mb-1 block w-full rounded-sm px-3 py-2 text-left text-sm font-medium transition-colors">
+            🏠 Vue d&apos;ensemble
+          </button>
+          {categories.map(cat => (
+            <div key={cat.label} className="mt-4">
+              <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "#3a3a3a" }}>{cat.icon} {cat.label}</p>
+              <div className="space-y-0.5">
+                {cat.items.map(item => (
+                  <button key={item} onClick={() => setTab(item as Tab)} style={navStyle(tab === item)}
+                    className="block w-full rounded-sm px-3 py-2 text-left text-sm font-medium transition-colors">
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="min-w-0">
+
+      {/* ── Vue d'ensemble ── */}
+      {tab === "Vue d'ensemble" && (
+        <div className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Clans" value={clans.length} />
+            <StatCard label="Utilisateurs" value={users.length} />
+            <StatCard label="Clans suspendus" value={clans.filter(c => c.suspended).length} accent={clans.some(c => c.suspended)} />
+            <StatCard label="Contacts non lus" value={contacts.filter(c => !c.read).length} accent={contacts.some(c => !c.read)} />
+            <StatCard label="Demandes de clan en attente" value={clanRequests.filter(r => r.status === "pending").length} accent={clanRequests.some(r => r.status === "pending")} />
+            <StatCard label="Événements en attente" value={hubEvents.filter(e => e.hubStatus === "pending").length} accent={hubEvents.some(e => e.hubStatus === "pending")} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {contacts.some(c => !c.read) && (
+              <button onClick={() => setTab("Contacts")} className="rounded-sm border px-4 py-2 text-sm" style={{ borderColor: "#c9a84c40", color: "#c9a84c" }}>
+                → Traiter les contacts non lus
+              </button>
+            )}
+            {clanRequests.some(r => r.status === "pending") && (
+              <button onClick={() => setTab("Contacts")} className="rounded-sm border px-4 py-2 text-sm" style={{ borderColor: "#c9a84c40", color: "#c9a84c" }}>
+                → Répondre aux demandes de clan
+              </button>
+            )}
+            {hubEvents.some(e => e.hubStatus === "pending") && (
+              <button onClick={() => setTab("Événements")} className="rounded-sm border px-4 py-2 text-sm" style={{ borderColor: "#c9a84c40", color: "#c9a84c" }}>
+                → Approuver les événements en attente
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Clans ── */}
       {tab === "Clans" && (
@@ -914,8 +1013,68 @@ export default function HubAdminPage() {
         const unread = contacts.filter(c => !c.read).length;
         const typeLabels: Record<string, string> = { rgpd: "RGPD", recrutement: "Recrutement", bug: "Bug", autre: "Autre" };
         const displayed = contactFilter === "unread" ? contacts.filter(c => !c.read) : contacts;
+        const clanRequestCategoryLabels: Record<string, string> = { question: "Question technique", premium: "Demande premium", signalement: "Signalement", autre: "Autre" };
+        const clanRequestStatusLabels: Record<string, string> = { pending: "En attente", answered: "Répondue", closed: "Fermée" };
+        const pendingClanRequests = clanRequests.filter(r => r.status === "pending").length;
+        const displayedClanRequests = clanRequestFilter === "pending" ? clanRequests.filter(r => r.status === "pending") : clanRequests;
+
         return (
           <div className="space-y-6">
+            {/* Demandes des admins de clan */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "#c9a84c" }}>
+                  Demandes des admins de clan {pendingClanRequests > 0 && <span style={{ color: "#f2f2f5" }}>({pendingClanRequests} en attente)</span>}
+                </h3>
+                <div className="flex gap-2">
+                  {(["pending", "all"] as const).map(f => (
+                    <button key={f} onClick={() => setClanRequestFilter(f)}
+                      className="rounded-sm border px-3 py-1.5 text-xs font-semibold"
+                      style={{ borderColor: clanRequestFilter === f ? "#f2f2f5" : "#2a2a2a", color: clanRequestFilter === f ? "#f2f2f5" : "#4a4a4a" }}>
+                      {f === "pending" ? `En attente (${pendingClanRequests})` : `Toutes (${clanRequests.length})`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {displayedClanRequests.length === 0 && <p className="text-sm" style={{ color: "#3a3a3a" }}>Aucune demande d&apos;admin de clan.</p>}
+              <div className="space-y-2">
+                {displayedClanRequests.map(r => (
+                  <div key={r.id} className="rounded-sm border" style={{ borderColor: r.status === "pending" ? "#c9a84c30" : "#1a1a1a", background: r.status === "pending" ? "#c9a84c08" : "#0a0a0a" }}>
+                    <div className="flex items-start gap-3 p-4 cursor-pointer" onClick={() => setOpenClanRequest(openClanRequest === r.id ? null : r.id)}>
+                      <div className="mt-1.5 h-2 w-2 rounded-full flex-shrink-0" style={{ background: r.status === "pending" ? "#c9a84c" : r.status === "answered" ? "#22c55e" : "#2a2a2a" }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                          <span className="text-xs font-semibold uppercase tracking-[0.15em]" style={{ color: "#c9a84c" }}>{clanRequestCategoryLabels[r.category] ?? r.category}</span>
+                          <span className="text-sm font-semibold" style={{ color: r.clan.colorPrimary }}>{r.clan.name}</span>
+                          <span className="text-xs" style={{ color: "#4a4a4a" }}>par {r.author.displayName}</span>
+                          <span className="text-xs ml-auto" style={{ color: "#3a3a3a" }}>{new Date(r.createdAt).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        </div>
+                        <p className="text-xs" style={{ color: "#6b7280" }}>{r.subject}</p>
+                      </div>
+                    </div>
+                    {openClanRequest === r.id && (
+                      <div className="border-t px-4 pb-4 pt-3" style={{ borderColor: "#1a1a1a" }}>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "#e5e7eb" }}>{r.message}</p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className="text-xs" style={{ color: "#4a4a4a" }}>Statut : {clanRequestStatusLabels[r.status]}</span>
+                          {r.status !== "answered" && (
+                            <button onClick={() => setClanRequestStatus(r.id, "answered")} className="rounded-sm border px-3 py-1.5 text-xs" style={{ borderColor: "#22c55e40", color: "#22c55e" }}>Marquer répondue</button>
+                          )}
+                          {r.status !== "closed" && (
+                            <button onClick={() => setClanRequestStatus(r.id, "closed")} className="rounded-sm border px-3 py-1.5 text-xs" style={{ borderColor: "#2a2a2a", color: "#9ca3af" }}>Fermer</button>
+                          )}
+                          <a href={`/clan/${r.clan.slug}/admin`} className="rounded-sm border px-3 py-1.5 text-xs" style={{ borderColor: "#2a2a2a", color: "#9ca3af" }}>
+                            Voir le clan
+                          </a>
+                          <button onClick={() => deleteClanRequest(r.id)} className="rounded-sm px-3 py-1.5 text-xs ml-auto" style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444" }}>Supprimer</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Email notification */}
             <div className="rounded-sm border p-4 space-y-3" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
               <h3 className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "#4a4a4a" }}>Email de notification</h3>
@@ -982,6 +1141,8 @@ export default function HubAdminPage() {
           </div>
         );
       })()}
+        </div>
+      </div>
     </div>
   );
 }

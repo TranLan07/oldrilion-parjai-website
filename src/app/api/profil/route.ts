@@ -13,8 +13,10 @@ export async function GET() {
       publicId: true, hubRole: true, anonymous: true,
       role: true, grade: true, specialization: true, publicSpecialization: true,
       permissionLevel: true, mandalorien: true,
+      discours: true, bio: true,
+      profileVisDiscours: true, profileVisBio: true, profileVisClanInfo: true, profileShowRealSpec: true,
       specializationRef: { select: { secret: true, color: true } },
-      clan: { select: { id: true, slug: true, name: true, colorBg: true, colorPrimary: true, colorAccent: true } },
+      clan: { select: { id: true, slug: true, name: true, colorBg: true, colorPrimary: true, colorAccent: true, profilesPublic: true } },
     },
   });
 
@@ -32,10 +34,18 @@ export async function PUT(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
 
-  const { displayName, anonymous, publicSpecialization } = await req.json();
+  const { displayName, anonymous, publicSpecialization, discours, bio, profileVisDiscours, profileVisBio, profileVisClanInfo, profileShowRealSpec } = await req.json();
   const data: Record<string, unknown> = {};
   if (displayName !== undefined && displayName.trim()) data.displayName = displayName.trim();
   if (anonymous !== undefined) data.anonymous = Boolean(anonymous);
+
+  if (discours !== undefined) data.discours = String(discours).slice(0, 140).trim();
+  if (bio !== undefined) data.bio = String(bio).slice(0, 2000).trim();
+  const VALID_VIS = ["public", "clan", "private"];
+  if (profileVisDiscours !== undefined && VALID_VIS.includes(profileVisDiscours)) data.profileVisDiscours = profileVisDiscours;
+  if (profileVisBio !== undefined && VALID_VIS.includes(profileVisBio)) data.profileVisBio = profileVisBio;
+  if (profileVisClanInfo !== undefined && VALID_VIS.includes(profileVisClanInfo)) data.profileVisClanInfo = profileVisClanInfo;
+  if (profileShowRealSpec !== undefined) data.profileShowRealSpec = Boolean(profileShowRealSpec);
 
   // Couverture publique : une spé publique (non-secrète) du clan de l'utilisateur.
   if (publicSpecialization !== undefined) {
@@ -52,5 +62,10 @@ export async function PUT(req: NextRequest) {
   }
 
   const user = await prisma.user.update({ where: { id: session.user.id }, data });
-  return NextResponse.json({ success: true, anonymous: user.anonymous, publicSpecialization: user.publicSpecialization });
+  return NextResponse.json({
+    success: true, anonymous: user.anonymous, publicSpecialization: user.publicSpecialization,
+    discours: user.discours, bio: user.bio,
+    profileVisDiscours: user.profileVisDiscours, profileVisBio: user.profileVisBio, profileVisClanInfo: user.profileVisClanInfo,
+    profileShowRealSpec: user.profileShowRealSpec,
+  });
 }

@@ -5,14 +5,20 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useDebug } from "./DebugContext";
 
+type Visibility = "public" | "clan" | "private";
 type UserProfile = {
   id: string; displayName: string; username: string;
   publicId: string; hubRole: string; anonymous: boolean;
   role: string; grade: string; specialization: string; publicSpecialization: string;
   permissionLevel: number; mandalorien: boolean;
   specializationSecret: boolean; specializationColor: string | null;
-  clan: { id: string; slug: string; name: string; colorBg: string; colorPrimary: string; colorAccent: string } | null;
+  discours: string; bio: string;
+  profileVisDiscours: Visibility; profileVisBio: Visibility; profileVisClanInfo: Visibility;
+  profileShowRealSpec: boolean;
+  clan: { id: string; slug: string; name: string; colorBg: string; colorPrimary: string; colorAccent: string; profilesPublic: boolean } | null;
 };
+
+const visLabels: Record<Visibility, string> = { public: "Public", clan: "Clan uniquement", private: "Personne" };
 type Notification = {
   id: string; type: string; title: string; body: string;
   read: boolean; link: string | null; createdAt: string;
@@ -41,12 +47,26 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
   const [leaving, setLeaving] = useState(false);
   const [publicSpecs, setPublicSpecs] = useState<string[]>([]);
   const [coverSaving, setCoverSaving] = useState(false);
+  const [discoursInput, setDiscoursInput] = useState("");
+  const [bioInput, setBioInput] = useState("");
+  const [visDiscours, setVisDiscours] = useState<Visibility>("public");
+  const [visBio, setVisBio] = useState<Visibility>("public");
+  const [visClanInfo, setVisClanInfo] = useState<Visibility>("public");
+  const [showRealSpec, setShowRealSpec] = useState(false);
+  const [publicSaving, setPublicSaving] = useState(false);
+  const [publicMsg, setPublicMsg] = useState("");
 
   useEffect(() => {
     if (!session?.user?.id) return;
     fetch("/api/profil").then(r => r.ok ? r.json() : null).then((d: UserProfile) => {
       setProfile(d);
       setDisplayName(d?.displayName ?? "");
+      setDiscoursInput(d?.discours ?? "");
+      setBioInput(d?.bio ?? "");
+      setVisDiscours(d?.profileVisDiscours ?? "public");
+      setVisBio(d?.profileVisBio ?? "public");
+      setVisClanInfo(d?.profileVisClanInfo ?? "public");
+      setShowRealSpec(d?.profileShowRealSpec ?? false);
       // Spés publiques du clan (pour choisir une couverture)
       if (d?.clan?.slug) {
         fetch(`/api/clan/${d.clan.slug}/specializations`).then(r => r.ok ? r.json() : []).then((specs: { name: string; secret: boolean }[]) => {
@@ -68,6 +88,21 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
     setCoverSaving(false);
     if (r.ok) { setProfile(p => p ? { ...p, publicSpecialization: value } : p); flash("Couverture publique mise à jour."); }
     else flash("Couverture invalide.");
+  }
+
+  async function savePublicProfile() {
+    setPublicSaving(true);
+    const r = await fetch("/api/profil", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        discours: discoursInput, bio: bioInput,
+        profileVisDiscours: visDiscours, profileVisBio: visBio, profileVisClanInfo: visClanInfo,
+        profileShowRealSpec: showRealSpec,
+      }),
+    });
+    setPublicSaving(false);
+    setPublicMsg(r.ok ? "Profil public mis à jour." : "Erreur lors de la sauvegarde.");
+    setTimeout(() => setPublicMsg(""), 3000);
   }
 
   async function saveName() {
@@ -238,6 +273,74 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
           <p className="mt-2 text-sm" style={{ color: "#6b7280" }}>Vous n&apos;appartenez à aucun clan pour le moment.</p>
         </section>
       )}
+
+      {/* Profil public */}
+      <section className="mb-6 rounded-sm border p-6 space-y-4" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: "#4a4a4a" }}>Profil public</h2>
+          <Link href={`/user/${profile.publicId}`} className="text-xs" style={{ color: "#c9a84c" }}>Voir mon profil public →</Link>
+        </div>
+        <p className="text-xs" style={{ color: "#6b7280" }}>
+          Choisissez ce que les autres voient sur <span style={{ fontFamily: "monospace" }}>/user/{profile.publicId}</span>. « Clan uniquement » n&apos;est visible que par les membres de votre clan ; « Personne » masque le bloc à tout le monde sauf les admins.
+        </p>
+
+        {clan && !clan.profilesPublic && (
+          <p className="rounded-sm border px-3 py-2 text-xs" style={{ borderColor: "#ef444440", background: "rgba(239,68,68,0.06)", color: "#fca5a5" }}>
+            Votre clan a désactivé les profils publics de ses membres — votre page reste inaccessible aux autres, quels que soient vos réglages ci-dessous (sauf pour les admins).
+          </p>
+        )}
+
+        <div>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <label className="text-xs text-foreground/50" style={{ color: "#9ca3af" }}>Discours</label>
+            <select value={visDiscours} onChange={e => setVisDiscours(e.target.value as Visibility)}
+              className="rounded-sm border px-2 py-1 text-xs outline-none" style={inputSt}>
+              {(["public", "clan", "private"] as Visibility[]).map(v => <option key={v} value={v}>{visLabels[v]}</option>)}
+            </select>
+          </div>
+          <input value={discoursInput} onChange={e => setDiscoursInput(e.target.value)} maxLength={140}
+            className="w-full rounded-sm border px-3 py-2 text-sm outline-none" style={inputSt} placeholder="Une courte accroche..." />
+        </div>
+
+        <div>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <label className="text-xs" style={{ color: "#9ca3af" }}>Biographie</label>
+            <select value={visBio} onChange={e => setVisBio(e.target.value as Visibility)}
+              className="rounded-sm border px-2 py-1 text-xs outline-none" style={inputSt}>
+              {(["public", "clan", "private"] as Visibility[]).map(v => <option key={v} value={v}>{visLabels[v]}</option>)}
+            </select>
+          </div>
+          <textarea value={bioInput} onChange={e => setBioInput(e.target.value)} rows={4} maxLength={2000}
+            className="w-full resize-y rounded-sm border px-3 py-2 text-sm outline-none" style={inputSt} placeholder="Votre biographie..." />
+        </div>
+
+        {clan && (
+          <div>
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <label className="text-xs" style={{ color: "#9ca3af" }}>Infos de clan (clan, grade, spécialisation)</label>
+              <select value={visClanInfo} onChange={e => setVisClanInfo(e.target.value as Visibility)}
+                className="rounded-sm border px-2 py-1 text-xs outline-none" style={inputSt}>
+                {(["public", "clan", "private"] as Visibility[]).map(v => <option key={v} value={v}>{visLabels[v]}</option>)}
+              </select>
+            </div>
+            {profile.specializationSecret && (
+              <label className="mt-2 flex items-center gap-2 text-xs cursor-pointer" style={{ color: "#9ca3af" }}>
+                <input type="checkbox" checked={showRealSpec} onChange={e => setShowRealSpec(e.target.checked)} />
+                Afficher ma vraie spécialisation sur le profil public (sinon, la couverture publique est affichée)
+              </label>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center gap-3">
+          <button onClick={savePublicProfile} disabled={publicSaving}
+            className="rounded-sm px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50"
+            style={{ background: "#f2f2f5", color: "#000" }}>
+            {publicSaving ? "..." : "Sauvegarder"}
+          </button>
+          {publicMsg && <span className="text-xs" style={{ color: "#9ca3af" }}>{publicMsg}</span>}
+        </div>
+      </section>
 
       {/* Modifier le profil */}
       <section className="mb-6 rounded-sm border p-6 space-y-4" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>

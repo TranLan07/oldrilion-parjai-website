@@ -51,3 +51,6 @@ next-env.d.ts
 /e2e/screenshots/
 /blob-report/
 /.last-run.json
+
+# dossier technique interne (usage local, jamais commité)
+/info/

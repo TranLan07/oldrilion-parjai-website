@@ -13,8 +13,9 @@ type PagePerm = { id: string; path: string; label: string; minPermission: number
 type ContentSection = { id: string; order: number; title: string; description: string };
 type Grade = { id: string; name: string; defaultPermission: number; order: number; _count: { users: number } };
 type Spec = { id: string; name: string; description: string; defaultPermission: number; secret: boolean; color: string | null; order: number; _count: { users: number } };
+type HelpRequest = { id: string; category: string; subject: string; message: string; status: string; createdAt: string };
 
-type Tab = "users" | "recruitment" | "channels" | "missions" | "evenements" | "pages" | "lore" | "rules" | "grades" | "specs" | "tags" | "whitelist" | "theme" | "settings";
+type Tab = "dashboard" | "users" | "recruitment" | "channels" | "missions" | "evenements" | "pages" | "lore" | "rules" | "grades" | "specs" | "tags" | "whitelist" | "values" | "theme" | "settings" | "aide";
 
 const inp = "w-full rounded border border-accent-dim/30 bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-accent";
 const btnDanger = "rounded bg-red-900/30 px-3 py-1.5 text-sm text-red-400 hover:bg-red-900/50";
@@ -24,6 +25,49 @@ const btnGreen = "rounded bg-green-800 px-4 py-1.5 text-sm text-white hover:bg-g
 
 const statusLabels: Record<string, string> = { en_cours: "En cours", validee: "Validée", abandonnee: "Abandonnée", ratee: "Ratée" };
 
+// Regroupement des onglets par catégorie, pour une navigation plus lisible qu'une liste plate.
+// "lore" représente aussi "rules" dans la sidebar (fusionnés dans un seul écran avec un sélecteur interne).
+const categories: { label: string; icon: string; items: { key: Tab; label: string; matches?: Tab[] }[] }[] = [
+  { label: "Membres", icon: "👥", items: [
+    { key: "users", label: "Utilisateurs" },
+    { key: "recruitment", label: "Recrutement" },
+    { key: "grades", label: "Grades" },
+    { key: "specs", label: "Spécialisations" },
+    { key: "whitelist", label: "Whitelist" },
+  ]},
+  { label: "Contenu du site", icon: "📖", items: [
+    { key: "lore", label: "Lore & Règles", matches: ["lore", "rules"] },
+    { key: "values", label: "Valeurs" },
+    { key: "pages", label: "Pages & accès" },
+  ]},
+  { label: "Activité", icon: "💬", items: [
+    { key: "channels", label: "Canaux" },
+    { key: "missions", label: "Missions" },
+    { key: "evenements", label: "Événements" },
+  ]},
+  { label: "Apparence & réglages", icon: "🎨", items: [
+    { key: "theme", label: "Thème" },
+    { key: "tags", label: "Tags" },
+    { key: "settings", label: "Paramètres" },
+  ]},
+];
+
+const sectionIntros: Partial<Record<Tab, string>> = {
+  users: "Gérez les membres du clan : rôle, grade, spécialisation et niveau de permission individuel.",
+  recruitment: "Traitez les candidatures reçues et personnalisez le formulaire de recrutement.",
+  grades: "La hiérarchie de votre clan. Chaque grade porte un niveau de permission par défaut.",
+  specs: "Les spécialités jouables de votre clan (rôles, métiers RP...).",
+  whitelist: "Donnez un accès ponctuel à des membres d'autres clans, sans les faire rejoindre le vôtre.",
+  values: "Les valeurs mises en avant sur la page d'accueil du clan.",
+  pages: "Réglez le niveau de permission minimum pour accéder à chaque page de contenu.",
+  channels: "Les canaux de discussion internes au clan.",
+  missions: "Suivez les missions RP en cours et leur statut.",
+  evenements: "Planifiez vos événements et proposez-les au calendrier du hub.",
+  theme: "Personnalisez les couleurs de votre espace clan.",
+  tags: "Les étiquettes qui décrivent votre clan dans l'annuaire du hub.",
+  settings: "Description publique et réglages d'anonymat du clan.",
+};
+
 export default function AdminPage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -32,8 +76,9 @@ export default function AdminPage() {
   const hubRole = (session as unknown as Record<string, unknown>)?.hubRole as string | undefined;
   // Les admins hub ont accès à l'admin de TOUS les clans, quel que soit leur niveau.
   const canAdmin = perm >= 10 || hubRole === "admin";
-  const [tab, setTab] = useState<Tab>("users");
+  const [tab, setTab] = useState<Tab>("dashboard");
   const [clanPremium, setClanPremium] = useState(false);
+  const [clanSuspended, setClanSuspended] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
   const [recruitments, setRecruitments] = useState<Recruitment[]>([]);
@@ -46,27 +91,48 @@ export default function AdminPage() {
   const [specs, setSpecs] = useState<Spec[]>([]);
 
   const apiMap: Record<Tab, string> = {
+    dashboard: "", aide: `/api/clan/${slug}/admin/help-request`,
     users: `/api/clan/${slug}/admin/users`, recruitment: `/api/clan/${slug}/admin/recruitment`, channels: `/api/clan/${slug}/admin/channels`,
     missions: `/api/clan/${slug}/admin/missions`, evenements: `/api/clan/${slug}/admin/evenements`, pages: `/api/clan/${slug}/admin/pages`,
     lore: `/api/clan/${slug}/admin/lore`, rules: `/api/clan/${slug}/admin/rules`, grades: `/api/clan/${slug}/admin/grades`, specs: `/api/clan/${slug}/admin/specializations`, tags: `/api/clan/${slug}/admin/tags`,
-    whitelist: `/api/clan/${slug}/admin/whitelist`, theme: `/api/clan/${slug}/admin/settings`, settings: `/api/clan/${slug}/admin/settings`,
+    whitelist: `/api/clan/${slug}/admin/whitelist`, values: `/api/clan/${slug}/admin/values`, theme: `/api/clan/${slug}/admin/settings`, settings: `/api/clan/${slug}/admin/settings`,
   };
 
+  // Vue d'ensemble utilisée par le Tableau de bord et l'Aide (checklist de premiers pas).
+  const loadOverview = useCallback(async () => {
+    const [gr, sp, ch, us, re, mi, lo, ru] = await Promise.all([
+      fetch(`/api/clan/${slug}/admin/grades`), fetch(`/api/clan/${slug}/admin/specializations`),
+      fetch(`/api/clan/${slug}/admin/channels`), fetch(`/api/clan/${slug}/admin/users`),
+      fetch(`/api/clan/${slug}/admin/recruitment`), fetch(`/api/clan/${slug}/admin/missions`),
+      fetch(`/api/clan/${slug}/admin/lore`), fetch(`/api/clan/${slug}/admin/rules`),
+    ]);
+    if (gr.ok) setGrades(await gr.json());
+    if (sp.ok) setSpecs(await sp.json());
+    if (ch.ok) setChannels(await ch.json());
+    if (us.ok) setUsers(await us.json());
+    if (re.ok) setRecruitments(await re.json());
+    if (mi.ok) setMissions(await mi.json());
+    if (lo.ok) setLoreSections(await lo.json());
+    if (ru.ok) setRuleSections(await ru.json());
+  }, [slug]);
+
   const load = useCallback(async () => {
+    if (tab === "dashboard" || tab === "aide") { await loadOverview(); return; }
     const res = await fetch(apiMap[tab]);
     if (!res.ok) return;
     const data = await res.json();
     const m: Record<Tab, (d: unknown) => void> = {
+      dashboard: () => {}, aide: () => {},
       users: (d) => setUsers(d as User[]), recruitment: (d) => setRecruitments(d as Recruitment[]),
       channels: (d) => setChannels(d as Channel[]), missions: (d) => setMissions(d as Mission[]), evenements: () => {},
-      whitelist: () => {}, theme: () => {}, settings: () => {},
+      whitelist: () => {}, values: () => {}, theme: () => {}, settings: () => {},
       pages: (d) => setPages(d as PagePerm[]), lore: (d) => setLoreSections(d as ContentSection[]),
       rules: (d) => setRuleSections(d as ContentSection[]), grades: (d) => setGrades(d as Grade[]),
       specs: (d) => setSpecs(d as Spec[]),
       tags: () => {},
     };
     m[tab]?.(data);
-    if (tab === "users" || tab === "channels") {
+    if (tab === "users" || tab === "channels" || tab === "pages") {
       const [gr, sp, us] = await Promise.all([
         fetch(`/api/clan/${slug}/admin/grades`),
         fetch(`/api/clan/${slug}/admin/specializations`),
@@ -83,7 +149,9 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (canAdmin && slug) {
-      fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => { if (d) setClanPremium(d.premium); });
+      fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => {
+        if (d) { setClanPremium(d.premium); setClanSuspended(Boolean(d.suspended)); }
+      });
     }
   }, [canAdmin, slug]);
 
@@ -97,40 +165,290 @@ export default function AdminPage() {
     load();
   }
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "users", label: "Utilisateurs" }, { key: "recruitment", label: "Recrutement" },
-    { key: "grades", label: "Grades" }, { key: "channels", label: "Canaux" },
-    { key: "missions", label: "Missions" }, { key: "evenements", label: "Evenements" }, { key: "lore", label: "Lore" },
-    { key: "rules", label: "Règles" }, { key: "specs", label: "Spécialisations" },
-    { key: "pages", label: "Permissions" }, { key: "tags", label: "Tags" },
-    { key: "whitelist", label: "Whitelist" }, { key: "theme", label: "Theme" }, { key: "settings", label: "Parametres" },
-  ];
+  function navBtnClass(active: boolean) {
+    return `block w-full rounded px-3 py-2 text-left text-sm transition-colors ${active ? "bg-accent text-background font-medium" : "text-foreground/70 hover:bg-surface-light hover:text-accent"}`;
+  }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12">
-      <h1 className="mb-8 text-4xl font-bold tracking-widest text-accent">ADMIN</h1>
-      <div className="mb-8 flex flex-wrap gap-2">
-        {tabs.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`rounded px-4 py-2 text-sm font-medium uppercase tracking-wider transition-colors ${tab === t.key ? "bg-accent text-background" : "bg-surface text-foreground/70 hover:text-accent"}`}
-          >{t.label}</button>
-        ))}
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold tracking-widest text-accent sm:text-4xl">ADMIN</h1>
+        <p className="text-sm text-foreground/40">/clan/{slug}</p>
       </div>
 
-      {tab === "users" && <UsersTab users={users} grades={grades} specs={specs} api={api} load={load} />}
-      {tab === "recruitment" && <RecruitmentTab recruitments={recruitments} slug={slug} premium={clanPremium} load={load} />}
-      {tab === "grades" && <GradesTab grades={grades} api={api} />}
-      {tab === "channels" && <ChannelsTab channels={channels} users={users} grades={grades} specs={specs} slug={slug} premium={clanPremium} api={api} load={load} />}
-      {tab === "missions" && <MissionsTab missions={missions} premium={clanPremium} api={api} />}
-      {tab === "evenements" && <EvenementsTab slug={slug} />}
-      {tab === "whitelist" && <WhitelistTab slug={slug} />}
-      {tab === "theme" && <ThemeTab slug={slug} premium={clanPremium} />}
-      {tab === "settings" && <SettingsTab slug={slug} />}
-      {tab === "lore" && <ContentTab sections={loreSections} endpoint={`/api/clan/${slug}/admin/lore`} label="Lore" api={api} />}
-      {tab === "rules" && <ContentTab sections={ruleSections} endpoint={`/api/clan/${slug}/admin/rules`} label="Règle" api={api} />}
-      {tab === "specs" && <SpecsTab specs={specs} premium={clanPremium} api={api} />}
-      {tab === "pages" && <PagesTab pages={pages} api={api} />}
-      {tab === "tags" && <TagsTab slug={slug} />}
+      {/* Nav mobile : menu déroulant */}
+      <div className="mb-5 lg:hidden">
+        <select value={tab} onChange={e => setTab(e.target.value as Tab)} className={inp}>
+          <option value="dashboard">🏠 Tableau de bord</option>
+          {categories.map(cat => (
+            <optgroup key={cat.label} label={`${cat.icon} ${cat.label}`}>
+              {cat.items.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
+            </optgroup>
+          ))}
+          <option value="aide">❓ Aide</option>
+        </select>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[230px_1fr]">
+        {/* Nav desktop : sidebar par catégories */}
+        <nav className="hidden lg:block">
+          <button onClick={() => setTab("dashboard")} className={navBtnClass(tab === "dashboard")}>🏠 Tableau de bord</button>
+          {categories.map(cat => (
+            <div key={cat.label} className="mt-4">
+              <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground/40">{cat.icon} {cat.label}</p>
+              <div className="space-y-0.5">
+                {cat.items.map(item => (
+                  <button key={item.key} onClick={() => setTab(item.key)}
+                    className={navBtnClass(item.matches ? item.matches.includes(tab) : tab === item.key)}>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div className="mt-6 border-t border-accent-dim/20 pt-3">
+            <button onClick={() => setTab("aide")} className={navBtnClass(tab === "aide")}>❓ Aide</button>
+          </div>
+        </nav>
+
+        <div className="min-w-0">
+          {sectionIntros[tab] && (
+            <p className="mb-5 text-sm text-foreground/50">{sectionIntros[tab]}</p>
+          )}
+
+          {tab === "dashboard" && (
+            <DashboardTab premium={clanPremium} suspended={clanSuspended} users={users} recruitments={recruitments}
+              channels={channels} missions={missions} grades={grades} specs={specs} loreSections={loreSections}
+              ruleSections={ruleSections} goTo={setTab} />
+          )}
+          {tab === "aide" && (
+            <AideTab slug={slug} grades={grades} specs={specs} loreSections={loreSections} ruleSections={ruleSections}
+              channels={channels} goTo={setTab} />
+          )}
+
+          {(tab === "lore" || tab === "rules") && (
+            <div>
+              <div className="mb-4 inline-flex rounded-lg border border-accent-dim/20 p-1">
+                <button onClick={() => setTab("lore")} className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${tab === "lore" ? "bg-accent text-background" : "text-foreground/60 hover:text-accent"}`}>Lore</button>
+                <button onClick={() => setTab("rules")} className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${tab === "rules" ? "bg-accent text-background" : "text-foreground/60 hover:text-accent"}`}>Règles</button>
+              </div>
+              {tab === "lore" && <ContentTab sections={loreSections} endpoint={`/api/clan/${slug}/admin/lore`} label="Lore" api={api} />}
+              {tab === "rules" && <ContentTab sections={ruleSections} endpoint={`/api/clan/${slug}/admin/rules`} label="Règle" api={api} />}
+            </div>
+          )}
+
+          {tab === "users" && <UsersTab users={users} grades={grades} specs={specs} api={api} load={load} />}
+          {tab === "recruitment" && <RecruitmentTab recruitments={recruitments} slug={slug} premium={clanPremium} load={load} />}
+          {tab === "grades" && <GradesTab grades={grades} api={api} />}
+          {tab === "channels" && <ChannelsTab channels={channels} users={users} grades={grades} specs={specs} slug={slug} premium={clanPremium} api={api} load={load} />}
+          {tab === "missions" && <MissionsTab missions={missions} premium={clanPremium} api={api} />}
+          {tab === "evenements" && <EvenementsTab slug={slug} />}
+          {tab === "whitelist" && <WhitelistTab slug={slug} />}
+          {tab === "values" && <ValuesTab slug={slug} premium={clanPremium} />}
+          {tab === "theme" && <ThemeTab slug={slug} premium={clanPremium} />}
+          {tab === "settings" && <SettingsTab slug={slug} />}
+          {tab === "specs" && <SpecsTab specs={specs} premium={clanPremium} api={api} />}
+          {tab === "pages" && <PagesTab pages={pages} grades={grades} api={api} />}
+          {tab === "tags" && <TagsTab slug={slug} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tableau de bord ──
+function DashboardTab({ premium, suspended, users, recruitments, channels, missions, grades, specs, loreSections, ruleSections, goTo }: {
+  premium: boolean; suspended: boolean; users: User[]; recruitments: Recruitment[]; channels: Channel[]; missions: Mission[];
+  grades: Grade[]; specs: Spec[]; loreSections: ContentSection[]; ruleSections: ContentSection[]; goTo: (t: Tab) => void;
+}) {
+  const pendingRecruits = recruitments.filter(r => r.status === "pending").length;
+  const activeMissions = missions.filter(m => m.status === "en_cours").length;
+  const steps: { done: boolean; label: string; tab: Tab }[] = [
+    { done: grades.length > 0, label: "Créer vos grades", tab: "grades" },
+    { done: specs.length > 0, label: "Ajouter vos spécialisations", tab: "specs" },
+    { done: loreSections.length > 0 || ruleSections.length > 0, label: "Rédiger votre lore ou vos règles", tab: "lore" },
+    { done: channels.length > 0, label: "Créer un canal de discussion", tab: "channels" },
+  ];
+  const doneCount = steps.filter(s => s.done).length;
+
+  return (
+    <div className="space-y-8">
+      {suspended && (
+        <div className="rounded-lg border border-red-900/40 bg-red-950/20 p-4 text-sm text-red-400">
+          ⚠ Ce clan est actuellement suspendu par les administrateurs du hub. Rendez-vous dans l&apos;onglet Aide pour les contacter.
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Membres" value={users.length} />
+        <StatCard label="Candidatures en attente" value={pendingRecruits} accent={pendingRecruits > 0} />
+        <StatCard label="Canaux" value={channels.length} />
+        <StatCard label="Missions en cours" value={activeMissions} />
+      </div>
+
+      <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${premium ? "bg-accent/15 text-accent" : "bg-surface-light text-foreground/50"}`}>
+        {premium ? "★ Clan premium" : "Clan standard"}
+      </span>
+
+      {pendingRecruits > 0 && (
+        <button onClick={() => goTo("recruitment")} className="block w-full rounded-lg border border-accent/25 bg-accent/5 px-5 py-3 text-left text-sm text-accent hover:bg-accent/10">
+          → {pendingRecruits} candidature{pendingRecruits > 1 ? "s" : ""} en attente de traitement
+        </button>
+      )}
+
+      {doneCount < steps.length && (
+        <div className="rounded-lg border border-accent/25 bg-accent/5 p-5">
+          <h3 className="mb-1 text-sm font-semibold uppercase tracking-wider text-accent">Premiers pas ({doneCount}/{steps.length})</h3>
+          <p className="mb-4 text-sm text-foreground/50">Configurez les bases de votre clan.</p>
+          <div className="space-y-2">
+            {steps.map(s => (
+              <button key={s.label} onClick={() => goTo(s.tab)} className="flex w-full items-center gap-3 rounded border border-accent-dim/20 bg-surface px-4 py-2.5 text-left text-sm hover:border-accent/40">
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs ${s.done ? "bg-green-800 text-white" : "bg-surface-light text-foreground/40"}`}>{s.done ? "✓" : ""}</span>
+                <span className={s.done ? "text-foreground/40 line-through" : "text-foreground"}>{s.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <div className="rounded-lg border border-accent-dim/20 bg-surface p-4">
+      <div className={`text-2xl font-bold ${accent ? "text-accent" : "text-foreground"}`}>{value}</div>
+      <div className="mt-1 text-xs uppercase tracking-wider text-foreground/50">{label}</div>
+    </div>
+  );
+}
+
+// ── Aide ──
+function AideTab({ slug, grades, specs, loreSections, ruleSections, channels, goTo }: {
+  slug: string; grades: Grade[]; specs: Spec[]; loreSections: ContentSection[]; ruleSections: ContentSection[]; channels: Channel[]; goTo: (t: Tab) => void;
+}) {
+  const [requests, setRequests] = useState<HelpRequest[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [form, setForm] = useState({ category: "question", subject: "", message: "" });
+  const [sending, setSending] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const loadRequests = useCallback(async () => {
+    const r = await fetch(`/api/clan/${slug}/admin/help-request`);
+    if (r.ok) setRequests(await r.json());
+    setLoaded(true);
+  }, [slug]);
+
+  useEffect(() => { loadRequests(); }, [loadRequests]);
+
+  async function send() {
+    if (!form.subject.trim() || !form.message.trim()) return;
+    setSending(true);
+    const r = await fetch(`/api/clan/${slug}/admin/help-request`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
+    });
+    setSending(false);
+    if (r.ok) {
+      setForm({ category: "question", subject: "", message: "" });
+      setMsg("Demande envoyée aux administrateurs du hub.");
+      loadRequests();
+    } else {
+      const d = await r.json();
+      setMsg(d.error || "Erreur lors de l'envoi.");
+    }
+    setTimeout(() => setMsg(""), 4000);
+  }
+
+  const steps: { done: boolean; label: string; desc: string; tab: Tab }[] = [
+    { done: grades.length > 0, label: "Grades", desc: "Définissez la hiérarchie de votre clan.", tab: "grades" },
+    { done: specs.length > 0, label: "Spécialisations", desc: "Ajoutez les rôles ou métiers jouables du clan.", tab: "specs" },
+    { done: loreSections.length > 0 || ruleSections.length > 0, label: "Lore & Règles", desc: "Rédigez l'histoire et le règlement du clan.", tab: "lore" },
+    { done: channels.length > 0, label: "Canaux", desc: "Créez vos premiers canaux de discussion.", tab: "channels" },
+    { done: true, label: "Recrutement", desc: "Le formulaire de candidature est actif par défaut — personnalisez-le si besoin.", tab: "recruitment" },
+  ];
+
+  const faq = [
+    { q: "C'est quoi un niveau de permission ?", a: "Un chiffre de 0 à 10 qui définit ce qu'un membre peut voir ou faire. Plus il est élevé, plus l'accès est large. Chaque grade et spécialisation porte un niveau par défaut ; on peut aussi en fixer un individuellement pour un membre, dans l'onglet Utilisateurs." },
+    { q: "Quelle différence entre Missions et Événements ?", a: "Une mission est une activité RP suivie dans la durée (statut, participants). Un événement a une date précise et peut être proposé au calendrier de tout le hub." },
+    { q: "Comment passer en premium ?", a: "Le statut premium est activé par les administrateurs du hub. Envoyez-leur une demande ci-dessous, catégorie « Demande de statut premium »." },
+    { q: "Qui peut voir l'onglet Admin ?", a: "Seuls les membres avec un niveau de permission 10 dans ce clan, ou un administrateur du hub." },
+  ];
+
+  const statusLabel: Record<string, string> = { pending: "En attente", answered: "Répondue", closed: "Fermée" };
+  const statusClass: Record<string, string> = { pending: "bg-yellow-900/30 text-yellow-400", answered: "bg-green-900/30 text-green-400", closed: "bg-surface-light text-foreground/40" };
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <h2 className="mb-1 text-lg font-semibold text-accent">Premiers pas</h2>
+        <p className="mb-4 text-sm text-foreground/50">Un guide rapide pour configurer votre clan.</p>
+        <div className="space-y-2">
+          {steps.map(s => (
+            <button key={s.label} onClick={() => goTo(s.tab)} className="flex w-full items-start gap-3 rounded border border-accent-dim/20 bg-surface px-4 py-3 text-left hover:border-accent/40">
+              <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs ${s.done ? "bg-green-800 text-white" : "bg-surface-light text-foreground/40"}`}>{s.done ? "✓" : ""}</span>
+              <span>
+                <span className="block text-sm font-medium text-foreground">{s.label}</span>
+                <span className="block text-xs text-foreground/50">{s.desc}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-lg font-semibold text-accent">Questions fréquentes</h2>
+        <div className="space-y-2">
+          {faq.map(f => (
+            <details key={f.q} className="rounded border border-accent-dim/20 bg-surface px-4 py-3">
+              <summary className="cursor-pointer text-sm font-medium text-foreground">{f.q}</summary>
+              <p className="mt-2 text-sm text-foreground/60">{f.a}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="mb-1 text-lg font-semibold text-accent">Contacter l&apos;administration du hub</h2>
+        <p className="mb-4 text-sm text-foreground/50">Question technique, demande de statut premium, signalement... votre message est transmis directement aux administrateurs du hub.</p>
+        <div className="max-w-xl space-y-3 rounded-lg border border-accent-dim/20 bg-surface p-5">
+          <div>
+            <label className="mb-1 block text-xs text-foreground/50">Catégorie</label>
+            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={inp}>
+              <option value="question">Question technique</option>
+              <option value="premium">Demande de statut premium</option>
+              <option value="signalement">Signalement</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-foreground/50">Objet</label>
+            <input value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} className={inp} placeholder="Résumé en une ligne" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-foreground/50">Message</label>
+            <textarea value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} rows={4} className={`resize-none ${inp}`} placeholder="Détaillez votre demande..." />
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={send} disabled={sending} className={btnPrimary + " disabled:opacity-50"}>{sending ? "Envoi..." : "Envoyer au hub"}</button>
+            {msg && <span className="text-xs text-foreground/60">{msg}</span>}
+          </div>
+        </div>
+
+        {loaded && requests.length > 0 && (
+          <div className="mt-6 max-w-xl space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground/50">Vos demandes précédentes</h3>
+            {requests.map(r => (
+              <div key={r.id} className="rounded border border-accent-dim/20 bg-surface p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-foreground">{r.subject}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${statusClass[r.status]}`}>{statusLabel[r.status]}</span>
+                </div>
+                <p className="mt-1 text-xs text-foreground/40">{new Date(r.createdAt).toLocaleDateString("fr-FR")}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -142,6 +460,7 @@ function UsersTab({ users, grades, specs, api, load }: { users: User[]; grades: 
 
   return (
     <div className="space-y-3">
+      {users.length === 0 && <p className="text-sm text-foreground/40">Aucun membre pour l&apos;instant.</p>}
       {users.map((u) => (
         <div key={u.id} className="rounded-lg border border-accent-dim/20 bg-surface p-4">
           {editing?.id === u.id ? (
@@ -413,6 +732,8 @@ function GradesTab({ grades, api }: { grades: Grade[]; api: (e: string, m: strin
         <button onClick={() => setShowForm(true)} className={btnPrimary}>+ Nouveau grade</button>
       )}
 
+      {grades.length === 0 && !showForm && <p className="text-sm text-foreground/40">Aucun grade pour l&apos;instant — créez votre premier grade pour définir la hiérarchie du clan.</p>}
+
       {grades.map((g) => (
         <div key={g.id} className="flex items-center justify-between rounded-lg border border-accent-dim/20 bg-surface p-4">
           {deleting === g.id ? (
@@ -567,6 +888,7 @@ function ChannelsTab({ channels, users, grades, specs, slug, premium, api, load 
         <>
           <button onClick={() => setShowForm(true)} className={btnPrimary}>+ Nouveau canal</button>
           {!premium && channels.length >= 1 && <p className="mt-2 text-xs" style={{ color: "#c9a84c" }}>★ Fonctionnalité premium : un seul canal disponible en version gratuite.</p>}
+          {channels.length === 0 && <p className="mt-2 text-sm text-foreground/40">Aucun canal — créez-en un pour permettre à vos membres de discuter.</p>}
         </>
       )}
 
@@ -687,6 +1009,8 @@ function MissionsTab({ missions, premium, api }: { missions: Mission[]; premium:
         <button onClick={() => setShowForm(true)} className={btnPrimary}>+ Nouvelle mission</button>
       )}
 
+      {missions.length === 0 && !showForm && <p className="text-sm text-foreground/40">Aucune mission pour l&apos;instant.</p>}
+
       {missions.map((m) => (
         <div key={m.id} className="rounded-lg border border-accent-dim/20 bg-surface p-4">
           {deleting === m.id ? (
@@ -763,6 +1087,8 @@ function ContentTab({ sections, endpoint, label, api }: { sections: ContentSecti
         <button onClick={() => setShowForm(true)} className={btnPrimary}>+ Nouvelle section {label}</button>
       )}
 
+      {sections.length === 0 && !showForm && <p className="text-sm text-foreground/40">Aucune section {label.toLowerCase()} pour l&apos;instant.</p>}
+
       {sections.map((s) => (
         <div key={s.id} className="rounded-lg border border-accent-dim/20 bg-surface p-4">
           {editing?.id === s.id ? (
@@ -807,10 +1133,17 @@ function ContentTab({ sections, endpoint, label, api }: { sections: ContentSecti
 }
 
 // ── Pages ──
-function PagesTab({ pages, api }: { pages: PagePerm[]; api: (e: string, m: string, b?: object) => Promise<void> }) {
+function PagesTab({ pages, grades, api }: { pages: PagePerm[]; grades: Grade[]; api: (e: string, m: string, b?: object) => Promise<void> }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ path: "", label: "", minPermission: 0 });
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  function permHint(level: number): string | null {
+    const sorted = [...grades].sort((a, b) => a.defaultPermission - b.defaultPermission);
+    let match: Grade | null = null;
+    for (const g of sorted) if (g.defaultPermission <= level) match = g;
+    return match ? `≈ ${match.name}` : level === 0 ? "≈ visiteur" : null;
+  }
 
   async function create() {
     if (!form.path || !form.label) return;
@@ -831,6 +1164,7 @@ function PagesTab({ pages, api }: { pages: PagePerm[]; api: (e: string, m: strin
               <select value={form.minPermission} onChange={(e) => setForm({ ...form, minPermission: parseInt(e.target.value) })} className={inp}>
                 {Array.from({ length: 11 }, (_, i) => <option key={i} value={i}>{i}{i === 0 ? " (visiteur)" : ""}</option>)}
               </select>
+              {permHint(form.minPermission) && <p className="mt-1 text-xs text-foreground/40">{permHint(form.minPermission)}</p>}
             </div>
           </div>
           <div className="flex gap-2">
@@ -841,6 +1175,8 @@ function PagesTab({ pages, api }: { pages: PagePerm[]; api: (e: string, m: strin
       ) : (
         <button onClick={() => setShowForm(true)} className={btnPrimary}>+ Nouvelle page</button>
       )}
+
+      {pages.length === 0 && !showForm && <p className="text-sm text-foreground/40">Aucune permission définie — par défaut, toutes les pages sont visibles à partir du niveau 0 (visiteur).</p>}
 
       {pages.map((p) => (
         <div key={p.id} className="flex items-center justify-between rounded-lg border border-accent-dim/20 bg-surface p-4">
@@ -863,6 +1199,7 @@ function PagesTab({ pages, api }: { pages: PagePerm[]; api: (e: string, m: strin
                 <select value={p.minPermission} onChange={(e) => api("/api/clan/${slug}/admin/pages", "PUT", { id: p.id, minPermission: parseInt(e.target.value) })} className={`w-20 ${inp}`}>
                   {Array.from({ length: 11 }, (_, i) => <option key={i} value={i}>{i}{i === 0 ? " (public)" : ""}</option>)}
                 </select>
+                {permHint(p.minPermission) && <span className="text-xs text-foreground/40">{permHint(p.minPermission)}</span>}
                 <button onClick={() => setDeleting(p.id)} className={btnDanger}>Supprimer</button>
               </div>
             </>
@@ -923,6 +1260,8 @@ function SpecsTab({ specs, premium, api }: { specs: Spec[]; premium: boolean; ap
       ) : (
         <button onClick={() => setShowForm(true)} className={btnPrimary}>+ Nouvelle spécialisation</button>
       )}
+
+      {specs.length === 0 && !showForm && <p className="text-sm text-foreground/40">Aucune spécialisation pour l&apos;instant.</p>}
 
       {specs.map(s => (
         <div key={s.id} className="rounded-sm border p-4" style={{ borderColor: s.secret ? "rgba(162,89,224,0.3)" : "var(--beskar-600)", background: "var(--beskar-800)" }}>
@@ -1109,6 +1448,7 @@ function EvenementsTab({ slug }: { slug: string }) {
         <button onClick={create} className={btnPrimary}>Creer</button>
       </div>
       <div className="space-y-2">
+        {events.length === 0 && <p className="text-sm text-foreground/40">Aucun événement pour l&apos;instant.</p>}
         {events.map(ev => (
           <div key={ev.id} className="flex items-center justify-between rounded border border-accent-dim/20 bg-surface p-3">
             <div>
@@ -1209,6 +1549,87 @@ function WhitelistTab({ slug }: { slug: string }) {
   );
 }
 
+// -- ValuesTab : valeurs affichées sur l'accueil du clan --
+type CValue = { title: string; description: string; color: string | null };
+function ValuesTab({ slug, premium }: { slug: string; premium: boolean }) {
+  const [values, setValues] = useState<CValue[]>([]);
+  const [accent, setAccent] = useState("#c0392b");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    fetch(`/api/clan/${slug}/admin/values`).then(r => r.ok ? r.json() : null).then(d => {
+      if (d) setValues((d.values || []).map((v: CValue) => ({ title: v.title, description: v.description, color: v.color })));
+      setLoaded(true);
+    });
+    fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => { if (d?.colorAccent) setAccent(d.colorAccent); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function update(i: number, patch: Partial<CValue>) { setValues(vs => vs.map((v, j) => j === i ? { ...v, ...patch } : v)); }
+  function add() { if (values.length < 6) setValues(vs => [...vs, { title: "", description: "", color: null }]); }
+  function remove(i: number) { setValues(vs => vs.filter((_, j) => j !== i)); }
+  function move(i: number, dir: -1 | 1) {
+    setValues(vs => { const n = [...vs]; const j = i + dir; if (j < 0 || j >= n.length) return n; [n[i], n[j]] = [n[j], n[i]]; return n; });
+  }
+
+  async function save() {
+    setSaving(true); setMsg("");
+    const r = await fetch(`/api/clan/${slug}/admin/values`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values }),
+    });
+    const d = await r.json();
+    setSaving(false);
+    setMsg(r.ok ? "Valeurs enregistrées." : (d.error || "Erreur"));
+    setTimeout(() => setMsg(""), 3000);
+  }
+
+  if (!loaded) return null;
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <p className="text-sm" style={{ color: "var(--beskar-300)" }}>
+        Les valeurs (titre + description) affichées sur l&apos;accueil du clan. Par défaut elles prennent la couleur accent du clan.
+        {!premium && <span style={{ color: "#c9a84c" }}> La couleur personnalisée par valeur est réservée aux clans premium.</span>}
+      </p>
+
+      {values.map((v, i) => (
+        <div key={i} className="rounded border p-4 space-y-3" style={{ borderColor: "var(--beskar-700)", background: "var(--beskar-800)" }}>
+          <div className="flex items-center gap-2">
+            <input value={v.title} onChange={e => update(i, { title: e.target.value })} placeholder="Titre (ex : Honneur)" className={`flex-1 ${inp}`} />
+            <button onClick={() => move(i, -1)} className="px-2 text-xs" style={{ color: "var(--beskar-400)" }} title="Monter">▲</button>
+            <button onClick={() => move(i, 1)} className="px-2 text-xs" style={{ color: "var(--beskar-400)" }} title="Descendre">▼</button>
+            <button onClick={() => remove(i)} className="px-2 text-xs" style={{ color: "#ef4444" }} title="Supprimer">✕</button>
+          </div>
+          <textarea value={v.description} onChange={e => update(i, { description: e.target.value })} rows={2} placeholder="Description" className={`resize-none w-full ${inp}`} />
+          <div className="flex items-center gap-3">
+            <span className="text-xs" style={{ color: "var(--beskar-400)" }}>Couleur :</span>
+            {premium ? (
+              <>
+                <input type="color" value={v.color || accent} onChange={e => update(i, { color: e.target.value })}
+                  className="h-8 w-12 cursor-pointer rounded border border-accent-dim/30 bg-background p-0.5" />
+                {v.color && <button onClick={() => update(i, { color: null })} className="text-xs" style={{ color: "var(--beskar-400)" }}>Réinitialiser (accent)</button>}
+                {!v.color && <span className="text-xs" style={{ color: "var(--beskar-500)" }}>accent du clan</span>}
+              </>
+            ) : (
+              <span className="flex items-center gap-2 text-xs" style={{ color: "var(--beskar-500)" }}>
+                <span className="inline-block h-4 w-4 rounded" style={{ background: accent }} /> accent du clan
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
+
+      <div className="flex flex-wrap items-center gap-2">
+        {values.length < 6 && <button onClick={add} className={btnSecondary}>+ Ajouter une valeur</button>}
+        <button onClick={save} disabled={saving} className={btnPrimary + " disabled:opacity-50"}>{saving ? "..." : "Enregistrer"}</button>
+        {msg && <span className="text-xs" style={{ color: msg.includes("enregistr") ? "#22c55e" : "#ef4444" }}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
 // -- ThemeTab --
 function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
   const [colors, setColors] = useState({ colorBg: "#000000", colorPrimary: "#c9a84c", colorAccent: "#c0392b", colorText: "#e8e6e3", colorCard: "#0d0d0d" });
@@ -1293,13 +1714,13 @@ function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
 
 // -- SettingsTab --
 function SettingsTab({ slug }: { slug: string }) {
-  const [form, setForm] = useState({ description: "", anonRevealLevel: 5 });
+  const [form, setForm] = useState({ description: "", anonRevealLevel: 5, profilesPublic: true });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => {
-      if (d) setForm({ description: d.description ?? "", anonRevealLevel: d.anonRevealLevel ?? 5 });
+      if (d) setForm({ description: d.description ?? "", anonRevealLevel: d.anonRevealLevel ?? 5, profilesPublic: d.profilesPublic ?? true });
     });
   }, []);
 
@@ -1327,6 +1748,15 @@ function SettingsTab({ slug }: { slug: string }) {
         </p>
         <input type="number" min={1} max={10} value={form.anonRevealLevel} onChange={e => setForm(f => ({ ...f, anonRevealLevel: Number(e.target.value) }))}
           className={inp + " w-24"} />
+      </div>
+      <div className="rounded border border-accent-dim/20 p-4">
+        <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+          <input type="checkbox" checked={form.profilesPublic} onChange={e => setForm(f => ({ ...f, profilesPublic: e.target.checked }))} />
+          Profils publics des membres
+        </label>
+        <p className="mt-1 text-xs text-foreground/40">
+          Si désactivé, la page de profil public (<span className="font-mono">/user/[code]</span>) de tous les membres de ce clan devient inaccessible aux autres — quels que soient leurs réglages individuels — sauf pour les administrateurs.
+        </p>
       </div>
       <button onClick={save} disabled={saving} className={btnPrimary + " disabled:opacity-50"}>
         {saving ? "Sauvegarde..." : saved ? "Sauvegarde !" : "Enregistrer"}

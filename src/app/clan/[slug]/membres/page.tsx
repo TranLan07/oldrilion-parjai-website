@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 
-type Member = { id: string; displayName: string; grade: string; specialization: string };
+type Member = { id: string; publicId: string; displayName: string; grade: string; specialization: string };
 
 export default function MembresPage() {
   const params = useParams();
@@ -41,7 +42,7 @@ export default function MembresPage() {
                   {m.displayName.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate" style={{ color: "var(--beskar-100)" }}>{m.displayName}</p>
+                  <Link href={`/user/${m.publicId}`} className="block font-medium truncate hover:underline" style={{ color: "var(--beskar-100)" }}>{m.displayName}</Link>
                   <p className="text-xs truncate" style={{ fontFamily: "var(--font-mono)", color: "var(--beskar-400)" }}>{m.grade}</p>
                 </div>
                 <span className="shrink-0 rounded-sm px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em]"
@@ -83,7 +84,7 @@ export default function MembresPage() {
                           style={{ background: "rgba(139,26,26,0.3)", color: "var(--beskar-100)" }}>
                           {m.displayName.charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-medium" style={{ color: "var(--beskar-100)" }}>{m.displayName}</span>
+                        <Link href={`/user/${m.publicId}`} className="font-medium hover:underline" style={{ color: "var(--beskar-100)" }}>{m.displayName}</Link>
                       </div>
                     </td>
                     <td className="px-6 py-4">

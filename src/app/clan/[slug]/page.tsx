@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 
 type Spec = { id: string; name: string; description: string; secret: boolean; color: string | null; order: number };
 type ClanInfo = { name: string; description: string; colorPrimary: string; colorAccent: string };
+type ClanValue = { id: string; title: string; description: string; color: string | null; order: number };
 
 export default function Home() {
   const params = useParams();
@@ -13,11 +14,13 @@ export default function Home() {
   const { data: session } = useSession();
   const [specs, setSpecs] = useState<Spec[]>([]);
   const [clan, setClan] = useState<ClanInfo | null>(null);
+  const [values, setValues] = useState<ClanValue[]>([]);
   const [openSpec, setOpenSpec] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/clan/${slug}/specializations`).then(r => r.json()).then(setSpecs).catch(() => {});
     fetch(`/api/clan/${slug}/public`).then(r => r.json()).then(setClan).catch(() => {});
+    fetch(`/api/clan/${slug}/values`).then(r => r.ok ? r.json() : []).then(setValues).catch(() => {});
   }, [slug]);
 
   const primary = "var(--clan-primary, #c9a84c)";
@@ -75,26 +78,27 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Values */}
-      <section className="w-full py-24" style={{ background: "var(--beskar-900)" }}>
-        <div className="mx-auto grid max-w-[1200px] gap-6 px-6 md:grid-cols-3">
-          {[
-            { title: "Honneur", desc: "Le Resol'nare guide chacun de nos pas. Nous vivons selon le code mandalorien.", accent: primary },
-            { title: "Fraternité", desc: "Aliit ori'shya tal'din — Le clan est plus que le sang. Chaque membre est famille.", accent },
-            { title: "Combat", desc: "Forgés dans la bataille, nous défendons les nôtres avec la ténacité du beskar.", accent: primary },
-          ].map(({ title, desc, accent: color }) => (
-            <div key={title} className="relative overflow-hidden rounded-sm p-8"
-              style={{ background: "var(--beskar-800)", border: "1px solid var(--beskar-600)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
-              <div className="absolute top-0 left-0 h-0.5 w-full" style={{ background: color }} />
-              <h3 className="mb-3 text-lg font-bold uppercase tracking-[0.14em]"
-                style={{ fontFamily: "var(--font-display)", color }}>
-                {title}
-              </h3>
-              <p style={{ color: "var(--beskar-200)", fontSize: "0.9375rem" }}>{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Values (personnalisables par le clan ; couleur par défaut = accent) */}
+      {values.length > 0 && (
+        <section className="w-full py-24" style={{ background: "var(--beskar-900)" }}>
+          <div className="mx-auto grid max-w-[1200px] gap-6 px-6 md:grid-cols-3">
+            {values.map((v) => {
+              const color = v.color || accent;
+              return (
+                <div key={v.id} className="relative overflow-hidden rounded-sm p-8"
+                  style={{ background: "var(--beskar-800)", border: "1px solid var(--beskar-600)", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)" }}>
+                  <div className="absolute top-0 left-0 h-0.5 w-full" style={{ background: color }} />
+                  <h3 className="mb-3 text-lg font-bold uppercase tracking-[0.14em]"
+                    style={{ fontFamily: "var(--font-display)", color }}>
+                    {v.title}
+                  </h3>
+                  <p style={{ color: "var(--beskar-200)", fontSize: "0.9375rem" }}>{v.description}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Specializations */}
       {specs.length > 0 && (

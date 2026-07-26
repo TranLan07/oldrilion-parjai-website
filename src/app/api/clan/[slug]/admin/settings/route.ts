@@ -20,6 +20,7 @@ export async function GET(_req: NextRequest, { params }: P) {
     anonRevealLevel: clan.anonRevealLevel,
     premium: clan.premium,
     suspended: clan.suspended,
+    profilesPublic: clan.profilesPublic,
   });
 }
 
@@ -30,13 +31,14 @@ export async function PUT(req: NextRequest, { params }: P) {
   if (!clan) return notFound();
   if (clan.suspended) return suspendedResponse();
 
-  const { description, colorBg, colorPrimary, colorAccent, colorText, colorCard, anonRevealLevel } = await req.json();
+  const { description, colorBg, colorPrimary, colorAccent, colorText, colorCard, anonRevealLevel, profilesPublic } = await req.json();
   const data: Record<string, unknown> = {};
   if (description !== undefined) data.description = description;
   if (colorBg) data.colorBg = colorBg;
   if (colorPrimary) data.colorPrimary = colorPrimary;
   if (colorAccent) data.colorAccent = colorAccent;
   if (anonRevealLevel !== undefined) data.anonRevealLevel = Number(anonRevealLevel);
+  if (profilesPublic !== undefined) data.profilesPublic = Boolean(profilesPublic);
   // Personnalisation avancée réservée aux clans premium
   if (clan.premium) {
     if (colorText) data.colorText = colorText;

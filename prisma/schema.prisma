@@ -30,6 +30,7 @@ model Clan {
   whitelist     ClanWhitelist[]
   recruitments  Recruitment[]
   recruitmentFields RecruitmentField[]
+  values        ClanValue[]
   loreSections  LoreSection[]
   ruleSections  RuleSection[]
   tags          ClanTag[]
@@ -47,6 +48,9 @@ model Clan {
   suspendedReason String?
   suspendedAt     DateTime?
 
+  // Profils publics des membres (/user/[code]) — désactivable par l'admin du clan
+  profilesPublic  Boolean   @default(true)
+
   // Banque
   bankBalance Int @default(0)
 
@@ -55,6 +59,7 @@ model Clan {
   diplomacyOwned   DiplomacyEntry[] @relation("DiplomacyOwner")
   diplomacyTargeted DiplomacyEntry[] @relation("DiplomacyTarget")
   diplomacyTags    DiplomacyTag[]
+  adminRequests    ClanAdminRequest[]
 }
 
 model Tag {
@@ -118,6 +123,15 @@ model User {
   mandalorien         Boolean         @default(false)  // tag mandalorien : auto si dans un clan, manuel sinon
   notifMissions       String          @default("all")  // "all" | "clan_only" | "global_only" | "none"
   notifEvents         String          @default("all")  // "all" | "clan_only" | "global_only" | "none"
+
+  // Profil public (/user/[publicId])
+  discours            String          @default("")  // courte accroche / citation
+  bio                 String          @default("")  // biographie
+  profileVisDiscours  String          @default("public")  // "public" | "clan" | "private"
+  profileVisBio       String          @default("public")
+  profileVisClanInfo  String          @default("public")  // bloc clan / grade / spécialisation
+  profileShowRealSpec Boolean         @default(false)  // spé secrète : true = vraie spé affichée, false = couverture
+
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
@@ -135,6 +149,7 @@ model User {
   reportedAs       Report[]           @relation("reported_user")
   marketplaceListings MarketplaceListing[]
   bankTransactionsAuthored ClanBankTransaction[]
+  clanAdminRequests ClanAdminRequest[]
 }
 
 // ─── GRADES & SPECS (scoped clan) ───────────────────────────────────────────
@@ -202,6 +217,17 @@ model Recruitment {
   user           User?    @relation("applicant", fields: [userId], references: [id])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// Valeurs affichées sur l'accueil du clan (ex : Honneur / Fraternité / Combat)
+model ClanValue {
+  id          String  @id @default(cuid())
+  clanId      String
+  clan        Clan    @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  title       String
+  description String  @default("")
+  color       String? // null = couleur accent du clan ; couleur custom = premium
+  order       Int     @default(0)
 }
 
 // Champs personnalisés du formulaire de recrutement (premium, max 10 par clan)
@@ -382,6 +408,21 @@ model Report {
   status       String   @default("pending") // "pending"|"resolved"|"escalated"
   clanId       String?  // scope du signalement (null = hub)
   createdAt    DateTime @default(now())
+}
+
+// ─── DEMANDES ADMIN DE CLAN → HUB ────────────────────────────────────────────
+// Envoyées depuis l'onglet Aide de l'admin de clan vers les administrateurs du hub.
+model ClanAdminRequest {
+  id        String   @id @default(cuid())
+  clanId    String
+  clan      Clan     @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  category  String   // "question" | "premium" | "signalement" | "autre"
+  subject   String
+  message   String
+  status    String   @default("pending") // "pending" | "answered" | "closed"
+  createdAt DateTime @default(now())
 }
 
 // ─── DICTIONNAIRE (global, pas scoped clan) ──────────────────────────────────
