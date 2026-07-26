@@ -4,11 +4,18 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-type WordResult = { original: string; translated: string; found: boolean };
+type WordOrigin = "dict" | "generated" | "unknown";
+type WordResult = { original: string; translated: string; origin: WordOrigin };
 type TranslationResult = {
   input: string; output: string;
   direction: "fr-to-mandoa" | "mandoa-to-fr";
   words: WordResult[];
+};
+
+const originStyle: Record<WordOrigin, { border: string; bg: string; text: string; label: string }> = {
+  dict: { border: "#2a2a2a", bg: "#111", text: "#c9a84c", label: "" },
+  generated: { border: "#3b6fa640", bg: "#0d1520", text: "#7aaeeb", label: "élaboré" },
+  unknown: { border: "#ef444440", bg: "#1a0d0d", text: "#ef4444", label: "non reconnu" },
 };
 
 export default function TraducteurPage() {
@@ -91,8 +98,11 @@ export default function TraducteurPage() {
       <p className="mb-1 text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: "#4a4a4a" }}>Hub</p>
       <h1 className="mb-2 text-4xl font-bold uppercase tracking-[0.14em]"
         style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>Traducteur Mando&apos;a</h1>
-      <p className="mb-10 text-sm" style={{ color: "#6b7280" }}>
+      <p className="mb-2 text-sm" style={{ color: "#6b7280" }}>
         Traduisez du français vers le Mando&apos;a et inversement. Basé sur le lexique officiel enrichi par les clans.
+      </p>
+      <p className="mb-10 text-xs" style={{ color: "#4a4a4a" }}>
+        Un mot français absent du dictionnaire se voit attribuer un mot mando&apos;a crédible, généré et mémorisé pour la suite — comme dans les canaux de transmission.
       </p>
 
       {/* Direction */}
@@ -141,21 +151,27 @@ export default function TraducteurPage() {
           </div>
 
           <div>
-            <p className="mb-3 text-xs uppercase tracking-[0.2em]" style={{ color: "#4a4a4a" }}>Détail mot par mot</p>
+            <div className="mb-3 flex items-center justify-between flex-wrap gap-3">
+              <p className="text-xs uppercase tracking-[0.2em]" style={{ color: "#4a4a4a" }}>Détail mot par mot</p>
+              <div className="flex items-center gap-4 text-[11px]" style={{ color: "#6b7280" }}>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: originStyle.dict.text }} /> Mot classique</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: originStyle.generated.text }} /> Mot élaboré</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: originStyle.unknown.text }} /> Non reconnu</span>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2">
-              {result.words.map((w, i) => (
-                <div key={i} className="rounded-sm border px-3 py-2 text-xs"
-                  style={{
-                    borderColor: w.found ? "#2a2a2a" : "#1a1a1a",
-                    background: w.found ? "#111" : "#0a0a0a",
-                    color: w.found ? "#e5e7eb" : "#3a3a3a",
-                  }}>
-                  <span style={{ color: "#6b7280" }}>{w.original}</span>
-                  {" → "}
-                  <span style={{ color: w.found ? "#c9a84c" : "#3a3a3a" }}>{w.translated}</span>
-                  {!w.found && <span style={{ color: "#2a2a2a" }}> (non trouvé)</span>}
-                </div>
-              ))}
+              {result.words.map((w, i) => {
+                const st = originStyle[w.origin];
+                return (
+                  <div key={i} className="rounded-sm border px-3 py-2 text-xs"
+                    style={{ borderColor: st.border, background: st.bg, color: "#e5e7eb" }}>
+                    <span style={{ color: "#6b7280" }}>{w.original}</span>
+                    {" → "}
+                    <span style={{ color: st.text }}>{w.translated}</span>
+                    {st.label && <span style={{ color: st.text, opacity: 0.7 }}> ({st.label})</span>}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
