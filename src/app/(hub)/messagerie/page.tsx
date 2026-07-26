@@ -1,7 +1,8 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 type BaseMember = { user: { id: string; displayName: string }; muted: boolean };
 type HubChannelRaw = {
@@ -49,7 +50,22 @@ function matchesTab(tab: Tab, kind: Kind): boolean {
 }
 
 export default function MessageriePage() {
+  return (
+    <Suspense fallback={<div className="p-12 text-center" style={{ color: "#6b7280" }}>Chargement...</div>}>
+      <MessageriePageInner />
+    </Suspense>
+  );
+}
+
+// useSearchParams() (et non une lecture manuelle de window.location.search) est indispensable
+// ici : lors d'une navigation client-side (clic sur un <Link>, ex. depuis la nav d'un clan),
+// window.location.search n'est pas garanti synchronisé au moment du montage du composant —
+// ce qui pouvait faire démarrer la page sur le mauvais clan/onglet, puis planter (canal actif
+// ne correspondant plus à la liste chargée). useSearchParams() reste toujours à jour.
+function MessageriePageInner() {
   const { data: session } = useSession();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const s = session as unknown as Record<string, unknown> | undefined;
   const meId = session?.user?.id;
   const hubRole = s?.hubRole as string | undefined;
@@ -62,8 +78,9 @@ export default function MessageriePage() {
   const isStrictHubAdmin = hubRole === "admin";
   const isClanAdmin = Boolean(clanSlug) && permissionLevel >= 10;
 
-  const [tab, setTab] = useState<Tab>("all");
-  const [queryClanSlug, setQueryClanSlug] = useState<string | null>(null);
+  const tabParam = searchParams.get("tab");
+  const tab: Tab = (tabParam === "all" || tabParam === "public" || tabParam === "clan" || tabParam === "dm") ? tabParam : "all";
+  const queryClanSlug = searchParams.get("clan");
   const [hubChannels, setHubChannels] = useState<HubChannelRaw[]>([]);
   const [clanChannels, setClanChannels] = useState<ClanChannelRaw[]>([]);
   const [hubLoaded, setHubLoaded] = useState(false);
@@ -93,14 +110,6 @@ export default function MessageriePage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const firstLoad = useRef(true);
   const sseRef = useRef<EventSource | null>(null);
-
-  // Lecture de ?tab=, ?channel= et ?clan= au montage (pas de useSearchParams pour éviter le Suspense boundary).
-  useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    const t = sp.get("tab");
-    if (t === "all" || t === "public" || t === "clan" || t === "dm") setTab(t);
-    setQueryClanSlug(sp.get("clan"));
-  }, []);
 
   // Clan cible de l'onglet "Clan" : celui demandé en query (ex: lien "Messages" depuis la
   // page d'un clan) si l'utilisateur est admin hub — sinon toujours son propre clan.
@@ -160,11 +169,11 @@ export default function MessageriePage() {
   useEffect(() => {
     if (!firstLoad.current || !hubLoaded || !clanLoaded) return;
     firstLoad.current = false;
-    const sp = new URLSearchParams(window.location.search);
-    const requested = sp.get("channel");
+    const requested = searchParams.get("channel");
     if (requested && channels.some(c => c.id === requested)) { setActiveId(requested); return; }
     const pool = channels.filter(c => matchesTab(tab, c.kind));
     if (pool.length > 0) setActiveId(pool[0].id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hubLoaded, clanLoaded, channels, tab]);
 
   const activeChannel = useMemo(() => channels.find(c => c.id === activeId) ?? null, [channels, activeId]);
@@ -195,7 +204,10 @@ export default function MessageriePage() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   function selectTab(t: Tab) {
-    setTab(t);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", t);
+    params.delete("channel");
+    router.replace(`/messagerie?${params.toString()}`, { scroll: false });
     setShowCreate(false); setShowAdmin(false); setShowFollow(false);
     const pool = channels.filter(c => matchesTab(t, c.kind));
     setActiveId(pool.length > 0 ? pool[0].id : null);
@@ -585,7 +597,7 @@ export default function MessageriePage() {
         </div>
 
         {/* Input */}
-        {activeId && (
+        {activeChannel && (
           <form onSubmit={sendMessage} className="border-t p-3" style={{ borderColor: "#1a1a1a" }}>
             {isMuted ? (
               <p className="text-center text-sm" style={{ color: "#ef4444" }}>Vous êtes muté sur ce canal.</p>
@@ -600,7 +612,7 @@ export default function MessageriePage() {
                   </button>
                 )}
                 <input type="text" value={newMsg} onChange={e => setNewMsg(e.target.value)}
-                  placeholder={mandoaMode ? "Message en Mando'a..." : `Message ${channelLabel(activeChannel!).icon} ${channelLabel(activeChannel!).text}...`}
+                  placeholder={mandoaMode ? "Message en Mando'a..." : `Message ${channelLabel(activeChannel).icon} ${channelLabel(activeChannel).text}...`}
                   className="min-w-0 flex-1 rounded border px-4 py-2 text-sm outline-none"
                   style={{ background: "#111", borderColor: mandoaMode ? `${accent}40` : "#2a2a2a", color: "#f2f2f5" }}
                   disabled={sending} />
