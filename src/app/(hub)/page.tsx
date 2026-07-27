@@ -45,11 +45,11 @@ export default async function HubHome() {
 
       {/* ── Stats ── */}
       <section className="border-y py-10" style={{ borderColor: "#1a1a1a", background: "#0a0a0a" }}>
-        <div className="mx-auto flex max-w-[1200px] items-center justify-center gap-12 px-6 flex-wrap">
+        <div className="mx-auto flex max-w-[1200px] flex-nowrap items-center justify-center gap-3 px-4 sm:gap-8 sm:px-6 md:gap-12">
           <Stat value={clans.length} label="Clans" />
-          <div className="h-8 w-px" style={{ background: "#2a2a2a" }} />
+          <div className="h-8 w-px shrink-0" style={{ background: "#2a2a2a" }} />
           <Stat value={clans.reduce((a, c) => a + c._count.members, 0)} label="Membres" />
-          <div className="h-8 w-px" style={{ background: "#2a2a2a" }} />
+          <div className="h-8 w-px shrink-0" style={{ background: "#2a2a2a" }} />
           <Stat value={missionCount} label="Missions" />
         </div>
       </section>
@@ -100,9 +100,9 @@ export default async function HubHome() {
 
 function Stat({ value, label }: { value: number | string; label: string }) {
   return (
-    <div className="text-center">
-      <p className="text-4xl font-bold" style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>{value}</p>
-      <p className="mt-1 text-xs uppercase tracking-[0.2em]" style={{ color: "#4a4a4a" }}>{label}</p>
+    <div className="shrink-0 text-center">
+      <p className="text-2xl font-bold sm:text-3xl md:text-4xl" style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>{value}</p>
+      <p className="mt-1 text-[10px] uppercase tracking-[0.1em] sm:text-xs sm:tracking-[0.2em]" style={{ color: "#4a4a4a" }}>{label}</p>
     </div>
   );
 }
