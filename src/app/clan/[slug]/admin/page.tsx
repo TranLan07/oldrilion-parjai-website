@@ -53,7 +53,7 @@ const categories: { label: string; icon: string; items: { key: Tab; label: strin
 ];
 
 const sectionIntros: Partial<Record<Tab, string>> = {
-  users: "Gérez les membres du clan : rôle, grade, spécialisation et niveau de permission individuel.",
+  users: "Gérez les membres du clan : rôle, grade, spécialisation et niveau de permission individuel. Vous pouvez aussi créer directement un accès pour un nouveau membre.",
   recruitment: "Traitez les candidatures reçues et personnalisez le formulaire de recrutement.",
   grades: "La hiérarchie de votre clan. Chaque grade porte un niveau de permission par défaut.",
   specs: "Les spécialités jouables de votre clan (rôles, métiers RP...).",
@@ -237,7 +237,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          {tab === "users" && <UsersTab users={users} grades={grades} specs={specs} api={api} load={load} />}
+          {tab === "users" && <UsersTab users={users} grades={grades} specs={specs} api={api} load={load} slug={slug} />}
           {tab === "recruitment" && <RecruitmentTab recruitments={recruitments} slug={slug} premium={clanPremium} load={load} />}
           {tab === "grades" && <GradesTab grades={grades} api={api} />}
           {tab === "channels" && <ChannelsTab channels={channels} users={users} grades={grades} specs={specs} slug={slug} premium={clanPremium} api={api} load={load} />}
@@ -454,12 +454,77 @@ function AideTab({ slug, grades, specs, loreSections, ruleSections, channels, go
 }
 
 // ── Users ──
-function UsersTab({ users, grades, specs, api, load }: { users: User[]; grades: Grade[]; specs: Spec[]; api: (e: string, m: string, b?: object) => Promise<void>; load: () => void }) {
+function UsersTab({ users, grades, specs, api, load, slug }: { users: User[]; grades: Grade[]; specs: Spec[]; api: (e: string, m: string, b?: object) => Promise<void>; load: () => void; slug: string }) {
   const [editing, setEditing] = useState<User | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ displayName: "", username: "", gradeId: "", specializationId: "" });
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [createResult, setCreateResult] = useState<{ username: string; tempPassword: string } | null>(null);
+
+  async function createUser() {
+    if (!createForm.displayName.trim() || !createForm.username.trim()) return;
+    setCreating(true); setCreateError("");
+    const r = await fetch(`/api/clan/${slug}/admin/users`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(createForm),
+    });
+    const d = await r.json();
+    setCreating(false);
+    if (!r.ok) { setCreateError(d.error || "Erreur"); return; }
+    setCreateResult({ username: d.username, tempPassword: d.tempPassword });
+    setCreateForm({ displayName: "", username: "", gradeId: "", specializationId: "" });
+    setShowCreate(false);
+    load();
+  }
 
   return (
     <div className="space-y-3">
+      {showCreate ? (
+        <div className="rounded-lg border border-accent/30 bg-surface p-5 space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-accent">Créer un accès utilisateur</h3>
+          <p className="text-xs text-foreground/50">
+            Crée directement un compte rattaché à ce clan, avec un mot de passe temporaire à communiquer au membre (changement obligatoire à la première connexion).
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div><label className="mb-1 block text-xs text-foreground/50">Nom affiché</label>
+              <input value={createForm.displayName} onChange={(e) => setCreateForm({ ...createForm, displayName: e.target.value })} className={inp} placeholder="Nom RP" />
+            </div>
+            <div><label className="mb-1 block text-xs text-foreground/50">Identifiant de connexion</label>
+              <input value={createForm.username} onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })} className={inp} placeholder="ex: jdupont" />
+            </div>
+            <div><label className="mb-1 block text-xs text-foreground/50">Grade</label>
+              <select value={createForm.gradeId} onChange={(e) => setCreateForm({ ...createForm, gradeId: e.target.value })} className={inp}>
+                <option value="">— Aucun (Recrue) —</option>
+                {grades.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+            <div><label className="mb-1 block text-xs text-foreground/50">Spécialisation</label>
+              <select value={createForm.specializationId} onChange={(e) => setCreateForm({ ...createForm, specializationId: e.target.value })} className={inp}>
+                <option value="">— Aucune —</option>
+                {specs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          </div>
+          {createError && <p className="text-sm text-red-400">{createError}</p>}
+          <div className="flex gap-2">
+            <button onClick={createUser} disabled={creating} className={btnGreen + " disabled:opacity-50"}>{creating ? "..." : "Créer"}</button>
+            <button onClick={() => { setShowCreate(false); setCreateError(""); }} className={btnSecondary}>Annuler</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setShowCreate(true)} className={btnPrimary}>+ Créer un accès utilisateur</button>
+      )}
+
+      {createResult && (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
+          <p className="text-sm text-accent">
+            Compte créé — Identifiant : <strong className="select-all">{createResult.username}</strong> — Mot de passe temporaire : <strong className="select-all">{createResult.tempPassword}</strong>
+          </p>
+          <p className="mt-1 text-xs text-foreground/50">Communiquez ces informations au membre. Il devra le changer à la première connexion.</p>
+        </div>
+      )}
+
       {users.length === 0 && <p className="text-sm text-foreground/40">Aucun membre pour l&apos;instant.</p>}
       {users.map((u) => (
         <div key={u.id} className="rounded-lg border border-accent-dim/20 bg-surface p-4">
