@@ -21,6 +21,11 @@ export default function Footer() {
           </div>
         </div>
         <div className="mt-8 border-t pt-6 text-center" style={{ borderColor: "#1a1a1a" }}>
+          <div className="mb-3 flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs">
+            <Link href="/mentions-legales" style={{ color: "#4a4a4a" }}>Mentions légales</Link>
+            <Link href="/cgu" style={{ color: "#4a4a4a" }}>CGU</Link>
+            <Link href="/confidentialite" style={{ color: "#4a4a4a" }}>Confidentialité</Link>
+          </div>
           <p className="text-xs" style={{ color: "#2a2a2a" }}>
             Site fictif dans le cadre d&apos;un serveur RP Star Wars · Aucune donnée commerciale
           </p>
