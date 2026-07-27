@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: P) {
   const mode = req.nextUrl.searchParams.get("mode") || "standard";
 
   if (mode === "dha") {
-    if (perm < 7) return NextResponse.json({ error: "Accès Dha requis (niveau 7)" }, { status: 403 });
+    if (perm < 7) return NextResponse.json({ error: "Accès classifié requis (niveau 7)" }, { status: 403 });
     const missions = await prisma.mission.findMany({
       where: { clanId: clan.id, confidentiality: { in: ["secret", "top_secret"] } },
       include: { members: { include: { user: { select: { id: true, displayName: true } } } } },

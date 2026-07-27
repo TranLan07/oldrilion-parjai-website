@@ -88,11 +88,11 @@ export default function MissionsPage() {
       <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--clan-accent, #4a4a4a)" }}>
-            {isDha ? "Operation Dha" : "Missions"}
+            {isDha ? "Opérations classifiées" : "Missions"}
           </p>
           <h1 className="text-4xl font-bold uppercase tracking-[0.14em]"
             style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, #f2f2f5)" }}>
-            {isDha ? "Classifiees" : "Missions"}
+            {isDha ? "Classifiées" : "Missions"}
           </h1>
         </div>
         <div className="flex gap-2">
@@ -107,7 +107,7 @@ export default function MissionsPage() {
             <button onClick={() => { setMode(isDha ? "standard" : "dha"); setFilter("all"); }}
               className="rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-all"
               style={{ borderColor: isDha ? "#a259e0" : "var(--clan-primary, #c9a84c)", color: isDha ? "#a259e0" : "var(--clan-primary, #c9a84c)" }}>
-              {isDha ? "Mode standard" : "Mode Dha"}
+              {isDha ? "Mode standard" : "Mode classifié"}
             </button>
           )}
         </div>
