@@ -20,6 +20,8 @@ model Clan {
   colorText    String   @default("#e8e6e3")  // couleur de texte custom (premium)
   colorCard    String   @default("#0d0d0d")  // couleur de fond des cartes (premium)
   websiteUrl   String   @default("")  // site web personnel du clan (optionnel) — bouton sur la page d'accueil
+  classifiedColor     String?  // couleur du mode classifié (premium, sinon fallback colorAccent)
+  classifiedColorMode String   @default("fixed")  // "fixed" | "role" (role = couleur de la spécialisation du membre, premium)
   createdAt    DateTime @default(now())
 
   members       User[]

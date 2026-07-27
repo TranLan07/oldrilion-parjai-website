@@ -22,6 +22,8 @@ export async function GET(_req: NextRequest, { params }: P) {
     suspended: clan.suspended,
     profilesPublic: clan.profilesPublic,
     websiteUrl: clan.websiteUrl,
+    classifiedColor: clan.classifiedColor,
+    classifiedColorMode: clan.classifiedColorMode,
   });
 }
 
@@ -32,7 +34,7 @@ export async function PUT(req: NextRequest, { params }: P) {
   if (!clan) return notFound();
   if (clan.suspended) return suspendedResponse();
 
-  const { description, colorBg, colorPrimary, colorAccent, colorText, colorCard, anonRevealLevel, profilesPublic, websiteUrl } = await req.json();
+  const { description, colorBg, colorPrimary, colorAccent, colorText, colorCard, anonRevealLevel, profilesPublic, websiteUrl, classifiedColor, classifiedColorMode } = await req.json();
   const data: Record<string, unknown> = {};
   if (description !== undefined) data.description = description;
   if (colorBg) data.colorBg = colorBg;
@@ -57,6 +59,8 @@ export async function PUT(req: NextRequest, { params }: P) {
   if (clan.premium) {
     if (colorText) data.colorText = colorText;
     if (colorCard) data.colorCard = colorCard;
+    if (classifiedColor !== undefined) data.classifiedColor = classifiedColor ? String(classifiedColor) : null;
+    if (classifiedColorMode !== undefined && ["fixed", "role"].includes(classifiedColorMode)) data.classifiedColorMode = classifiedColorMode;
   }
 
   const updated = await prisma.clan.update({ where: { id: clan.id }, data });

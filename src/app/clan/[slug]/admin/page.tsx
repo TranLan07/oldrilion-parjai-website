@@ -1698,12 +1698,18 @@ function ValuesTab({ slug, premium }: { slug: string; premium: boolean }) {
 // -- ThemeTab --
 function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
   const [colors, setColors] = useState({ colorBg: "#000000", colorPrimary: "#c9a84c", colorAccent: "#c0392b", colorText: "#e8e6e3", colorCard: "#0d0d0d" });
+  const [classifiedColor, setClassifiedColor] = useState<string | null>(null);
+  const [classifiedColorMode, setClassifiedColorMode] = useState<"fixed" | "role">("fixed");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => {
-      if (d) setColors({ colorBg: d.colorBg, colorPrimary: d.colorPrimary, colorAccent: d.colorAccent, colorText: d.colorText ?? "#e8e6e3", colorCard: d.colorCard ?? "#0d0d0d" });
+      if (d) {
+        setColors({ colorBg: d.colorBg, colorPrimary: d.colorPrimary, colorAccent: d.colorAccent, colorText: d.colorText ?? "#e8e6e3", colorCard: d.colorCard ?? "#0d0d0d" });
+        setClassifiedColor(d.classifiedColor ?? null);
+        setClassifiedColorMode(d.classifiedColorMode === "role" ? "role" : "fixed");
+      }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1711,7 +1717,8 @@ function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
   async function save() {
     setSaving(true);
     await fetch(`/api/clan/${slug}/admin/settings`, {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(colors),
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...colors, classifiedColor, classifiedColorMode }),
     });
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   }
@@ -1754,7 +1761,39 @@ function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#c9a84c" }}>★ Personnalisation premium</span>
         </div>
         {premium ? (
-          premiumFields.map(f => <Picker key={f.field} {...f} />)
+          <>
+            {premiumFields.map(f => <Picker key={f.field} {...f} />)}
+
+            <div className="border-t border-accent-dim/20 pt-4">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-foreground/50">Couleur du mode classifié</label>
+              <p className="mb-2 text-[10px] text-foreground/30">Utilisée pour le bouton et les badges du mode classifié des missions. Par défaut : couleur Accent.</p>
+              <div className="flex items-center gap-3">
+                <input type="color" value={classifiedColor ?? colors.colorAccent}
+                  onChange={e => setClassifiedColor(e.target.value)}
+                  className="h-10 w-16 cursor-pointer rounded border border-accent-dim/30 bg-background p-0.5" />
+                <input value={classifiedColor ?? ""} onChange={e => setClassifiedColor(e.target.value || null)}
+                  className={inp + " w-28 font-mono"} placeholder={colors.colorAccent} maxLength={7} />
+                <div className="h-8 w-8 rounded border border-accent-dim/30" style={{ background: classifiedColor ?? colors.colorAccent }} />
+                {classifiedColor && (
+                  <button type="button" onClick={() => setClassifiedColor(null)} className="text-xs text-foreground/40 hover:text-foreground/70">
+                    Réinitialiser
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-foreground/50">Mode de couleur classifié</label>
+              <p className="mb-2 text-[10px] text-foreground/30">
+                « Par rôle » affiche à chaque membre la couleur de sa spécialisation au lieu de la couleur fixe ci-dessus (les administrateurs gardent toujours la couleur fixe).
+              </p>
+              <select value={classifiedColorMode} onChange={e => setClassifiedColorMode(e.target.value === "role" ? "role" : "fixed")}
+                className={inp + " w-56"}>
+                <option value="fixed">Couleur fixe</option>
+                <option value="role">Par rôle (spécialisation du membre)</option>
+              </select>
+            </div>
+          </>
         ) : (
           <p className="text-xs text-foreground/40">Couleur de texte et de cartes personnalisées — réservé aux clans premium. Les couleurs des spécialisations se règlent dans l&apos;onglet Spécialisations.</p>
         )}

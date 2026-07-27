@@ -16,7 +16,7 @@ export async function GET() {
       discours: true, bio: true,
       profileVisDiscours: true, profileVisBio: true, profileVisClanInfo: true, profileShowRealSpec: true,
       specializationRef: { select: { secret: true, color: true } },
-      clan: { select: { id: true, slug: true, name: true, colorBg: true, colorPrimary: true, colorAccent: true, profilesPublic: true } },
+      clan: { select: { id: true, slug: true, name: true, colorBg: true, colorPrimary: true, colorAccent: true, profilesPublic: true, premium: true, classifiedColor: true, classifiedColorMode: true } },
     },
   });
 

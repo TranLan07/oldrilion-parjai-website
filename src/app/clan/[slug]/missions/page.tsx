@@ -41,6 +41,10 @@ export default function MissionsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
+  const [classifiedTheme, setClassifiedTheme] = useState({
+    premium: false, classifiedColor: null as string | null, classifiedColorMode: "fixed",
+    colorAccent: "#a259e0", specializationColor: null as string | null,
+  });
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/clan/${slug}/missions?mode=${mode}`);
@@ -48,6 +52,19 @@ export default function MissionsPage() {
   }, [slug, mode]);
 
   useEffect(() => { if (session) load(); }, [session, load]);
+
+  useEffect(() => {
+    if (!session) return;
+    fetch("/api/profil").then(r => r.ok ? r.json() : null).then(d => {
+      if (d?.clan) setClassifiedTheme({
+        premium: Boolean(d.clan.premium),
+        classifiedColor: d.clan.classifiedColor ?? null,
+        classifiedColorMode: d.clan.classifiedColorMode ?? "fixed",
+        colorAccent: d.clan.colorAccent ?? "#a259e0",
+        specializationColor: d.specializationColor ?? null,
+      });
+    }).catch(() => {});
+  }, [session]);
 
   async function saveMission(e: React.FormEvent) {
     e.preventDefault(); setSaving(true);
@@ -83,6 +100,15 @@ export default function MissionsPage() {
   const isDha = mode === "dha";
   const accentColor = "var(--clan-primary, #c9a84c)";
 
+  // Couleur du mode classifié : par défaut l'accent du clan ; en premium, personnalisable,
+  // ou dérivée de la spécialisation du membre en mode "par rôle" (les admins gardent la couleur classifiée fixe).
+  const base = classifiedTheme.premium && classifiedTheme.classifiedColor
+    ? classifiedTheme.classifiedColor
+    : classifiedTheme.colorAccent;
+  const classifiedColor = classifiedTheme.premium && classifiedTheme.classifiedColorMode === "role" && !isAdmin && classifiedTheme.specializationColor
+    ? classifiedTheme.specializationColor
+    : base;
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
       <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
@@ -106,7 +132,7 @@ export default function MissionsPage() {
           {canDha && (
             <button onClick={() => { setMode(isDha ? "standard" : "dha"); setFilter("all"); }}
               className="rounded-sm border px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-all"
-              style={{ borderColor: isDha ? "#a259e0" : "var(--clan-primary, #c9a84c)", color: isDha ? "#a259e0" : "var(--clan-primary, #c9a84c)" }}>
+              style={{ borderColor: isDha ? classifiedColor : "var(--clan-primary, #c9a84c)", color: isDha ? classifiedColor : "var(--clan-primary, #c9a84c)" }}>
               {isDha ? "Mode standard" : "Mode classifié"}
             </button>
           )}
@@ -185,7 +211,7 @@ export default function MissionsPage() {
                     )}
                     {isDha && mission.confidentiality !== "standard" && (
                       <span className="rounded-sm px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.1em]"
-                        style={{ color: mission.confidentiality === "top_secret" ? "#ef4444" : "#a259e0" }}>
+                        style={{ color: mission.confidentiality === "top_secret" ? "#ef4444" : classifiedColor }}>
                         {mission.confidentiality === "top_secret" ? "Top Secret" : "Secret"}
                       </span>
                     )}
