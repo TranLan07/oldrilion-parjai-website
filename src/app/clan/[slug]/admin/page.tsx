@@ -1779,22 +1779,27 @@ function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
 
 // -- SettingsTab --
 function SettingsTab({ slug }: { slug: string }) {
-  const [form, setForm] = useState({ description: "", anonRevealLevel: 5, profilesPublic: true });
+  const [form, setForm] = useState({ description: "", anonRevealLevel: 5, profilesPublic: true, websiteUrl: "" });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => {
-      if (d) setForm({ description: d.description ?? "", anonRevealLevel: d.anonRevealLevel ?? 5, profilesPublic: d.profilesPublic ?? true });
+      if (d) setForm({ description: d.description ?? "", anonRevealLevel: d.anonRevealLevel ?? 5, profilesPublic: d.profilesPublic ?? true, websiteUrl: d.websiteUrl ?? "" });
     });
   }, []);
 
   async function save() {
-    setSaving(true);
-    await fetch(`/api/clan/${slug}/admin/settings`, {
+    setSaving(true); setError("");
+    const r = await fetch(`/api/clan/${slug}/admin/settings`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
     });
-    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
+    setSaving(false);
+    if (!r.ok) { const d = await r.json(); setError(d.error || "Erreur"); return; }
+    const d = await r.json();
+    setForm(f => ({ ...f, websiteUrl: d.websiteUrl ?? f.websiteUrl }));
+    setSaved(true); setTimeout(() => setSaved(false), 2000);
   }
 
   return (
@@ -1823,6 +1828,15 @@ function SettingsTab({ slug }: { slug: string }) {
           Si désactivé, la page de profil public (<span className="font-mono">/user/[code]</span>) de tous les membres de ce clan devient inaccessible aux autres — quels que soient leurs réglages individuels — sauf pour les administrateurs.
         </p>
       </div>
+      <div>
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-foreground/50">Site web du clan (optionnel)</label>
+        <p className="mb-2 text-xs text-foreground/40">
+          Si renseigné, un bouton « Site du clan » apparaît à côté de « Notre histoire » sur la page d&apos;accueil du clan et ouvre ce lien dans un nouvel onglet. Laissez vide pour ne pas afficher le bouton.
+        </p>
+        <input value={form.websiteUrl} onChange={e => setForm(f => ({ ...f, websiteUrl: e.target.value }))}
+          className={inp} placeholder="https://mon-clan.exemple.com" />
+      </div>
+      {error && <p className="text-sm text-red-400">{error}</p>}
       <button onClick={save} disabled={saving} className={btnPrimary + " disabled:opacity-50"}>
         {saving ? "Sauvegarde..." : saved ? "Sauvegarde !" : "Enregistrer"}
       </button>

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 type Spec = { id: string; name: string; description: string; secret: boolean; color: string | null; order: number };
-type ClanInfo = { name: string; description: string; colorPrimary: string; colorAccent: string };
+type ClanInfo = { name: string; description: string; colorPrimary: string; colorAccent: string; websiteUrl?: string };
 type ClanValue = { id: string; title: string; description: string; color: string | null; order: number };
 
 export default function Home() {
@@ -75,6 +75,14 @@ export default function Home() {
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = primary; e.currentTarget.style.color = primary; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--beskar-500)"; e.currentTarget.style.color = "var(--beskar-200)"; }}
           >Notre histoire</a>
+          {clan?.websiteUrl && (
+            <a href={clan.websiteUrl} target="_blank" rel="noopener noreferrer"
+              className="rounded-sm border px-8 py-3 text-sm font-semibold uppercase tracking-[0.14em] transition-all"
+              style={{ fontFamily: "var(--font-display)", borderColor: "var(--beskar-500)", color: "var(--beskar-200)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = primary; e.currentTarget.style.color = primary; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--beskar-500)"; e.currentTarget.style.color = "var(--beskar-200)"; }}
+            >Site du clan</a>
+          )}
         </div>
       </section>
 

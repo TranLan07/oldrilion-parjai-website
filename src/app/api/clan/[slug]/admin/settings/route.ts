@@ -21,6 +21,7 @@ export async function GET(_req: NextRequest, { params }: P) {
     premium: clan.premium,
     suspended: clan.suspended,
     profilesPublic: clan.profilesPublic,
+    websiteUrl: clan.websiteUrl,
   });
 }
 
@@ -31,7 +32,7 @@ export async function PUT(req: NextRequest, { params }: P) {
   if (!clan) return notFound();
   if (clan.suspended) return suspendedResponse();
 
-  const { description, colorBg, colorPrimary, colorAccent, colorText, colorCard, anonRevealLevel, profilesPublic } = await req.json();
+  const { description, colorBg, colorPrimary, colorAccent, colorText, colorCard, anonRevealLevel, profilesPublic, websiteUrl } = await req.json();
   const data: Record<string, unknown> = {};
   if (description !== undefined) data.description = description;
   if (colorBg) data.colorBg = colorBg;
@@ -39,6 +40,19 @@ export async function PUT(req: NextRequest, { params }: P) {
   if (colorAccent) data.colorAccent = colorAccent;
   if (anonRevealLevel !== undefined) data.anonRevealLevel = Number(anonRevealLevel);
   if (profilesPublic !== undefined) data.profilesPublic = Boolean(profilesPublic);
+  if (websiteUrl !== undefined) {
+    const trimmed = String(websiteUrl).trim();
+    if (!trimmed) {
+      data.websiteUrl = "";
+    } else {
+      const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+      try {
+        data.websiteUrl = new URL(withScheme).toString();
+      } catch {
+        return NextResponse.json({ error: "Lien du site invalide" }, { status: 400 });
+      }
+    }
+  }
   // Personnalisation avancée réservée aux clans premium
   if (clan.premium) {
     if (colorText) data.colorText = colorText;
