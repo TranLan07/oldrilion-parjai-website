@@ -21,7 +21,7 @@ export async function GET() {
       ],
     },
     include: {
-      members: { include: { user: { select: { id: true, displayName: true } } } },
+      members: { include: { user: { select: { id: true, displayName: true, avatarUrl: true } } } },
       _count: { select: { messages: true } },
     },
     orderBy: { createdAt: "asc" },

@@ -1,13 +1,14 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useDebug } from "./DebugContext";
+import Avatar from "./Avatar";
 
 type Visibility = "public" | "clan" | "private";
 type UserProfile = {
-  id: string; displayName: string; username: string;
+  id: string; displayName: string; username: string; avatarUrl: string | null;
   publicId: string; hubRole: string; anonymous: boolean;
   role: string; grade: string; specialization: string; publicSpecialization: string;
   permissionLevel: number; mandalorien: boolean;
@@ -55,6 +56,8 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
   const [showRealSpec, setShowRealSpec] = useState(false);
   const [publicSaving, setPublicSaving] = useState(false);
   const [publicMsg, setPublicMsg] = useState("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -114,6 +117,25 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
     });
     setNameSaving(false);
     if (r.ok) { setProfile(p => p ? { ...p, displayName } : p); flash("Nom sauvegardé."); }
+  }
+
+  async function uploadAvatar(file: File) {
+    setAvatarUploading(true);
+    const form = new FormData();
+    form.append("file", file);
+    const r = await fetch("/api/profil/avatar", { method: "POST", body: form });
+    const d = await r.json();
+    setAvatarUploading(false);
+    if (r.ok) { setProfile(p => p ? { ...p, avatarUrl: d.url } : p); flash("Photo de profil mise à jour."); }
+    else flash(d.error || "Erreur lors de l'upload.");
+  }
+
+  async function removeAvatar() {
+    setAvatarUploading(true);
+    await fetch("/api/profil/avatar", { method: "DELETE" });
+    setAvatarUploading(false);
+    setProfile(p => p ? { ...p, avatarUrl: null } : p);
+    flash("Photo de profil supprimée.");
   }
 
   async function markRead(id: string) {
@@ -195,9 +217,22 @@ export default function ProfileView({ scope = "hub" }: { scope?: string }) {
       <section className="mb-6 rounded-sm border p-6 space-y-4" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
         <h2 className="text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: "#4a4a4a" }}>Informations générales</h2>
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold flex-shrink-0"
-            style={{ background: "#1a1a1a", color: "#f2f2f5", border: "1px solid #2a2a2a" }}>
-            {profile.displayName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?"}
+          <div className="relative flex-shrink-0 group">
+            <input ref={avatarInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); e.target.value = ""; }} />
+            <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={avatarUploading}
+              className="block rounded-full disabled:opacity-50" title="Changer la photo de profil"
+              style={{ border: "1px solid #2a2a2a" }}>
+              <Avatar src={profile.avatarUrl} name={profile.displayName} size={56} />
+            </button>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/50 text-[10px] font-semibold uppercase text-white opacity-0 transition-opacity group-hover:opacity-100">
+              {avatarUploading ? "…" : "Modifier"}
+            </div>
+            {profile.avatarUrl && !avatarUploading && (
+              <button type="button" onClick={removeAvatar} title="Supprimer la photo"
+                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-xs"
+                style={{ background: "#ef4444", color: "#fff" }}>×</button>
+            )}
           </div>
           <div>
             <p className="text-lg font-bold" style={{ color: "#f2f2f5" }}>{profile.displayName}</p>

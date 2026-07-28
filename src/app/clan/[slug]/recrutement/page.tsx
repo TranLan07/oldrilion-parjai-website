@@ -6,9 +6,9 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 type Spec = { id: string; name: string; description: string };
-type Field = { id: string; label: string; type: string; options: string[]; required: boolean; order: number };
+type Field = { id: string; key: "specialization" | "experience" | "motivation" | null; label: string; type: string; options: string[]; required: boolean; order: number };
 type Config = {
-  clanName: string; colorBg: string; colorPrimary: string; colorAccent: string;
+  clanName: string; colorBg: string; colorPrimary: string; colorAccent: string; premium: boolean;
   specializations: Spec[]; grades: string[]; fields: Field[];
 };
 
@@ -18,7 +18,7 @@ export default function RecrutementPage() {
   const clanId = (session as unknown as Record<string, unknown>)?.clanId as string | undefined;
 
   const [config, setConfig] = useState<Config | null>(null);
-  const [form, setForm] = useState({ rpName: "", discord: "", experience: "", motivation: "", specialization: "" });
+  const [form, setForm] = useState({ rpName: "", discord: "" });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -98,20 +98,7 @@ export default function RecrutementPage() {
           <Field label="Discord" required>
             <input type="text" required value={form.discord} onChange={e => setForm({ ...form, discord: e.target.value })} className={inputClass} style={inputStyle} />
           </Field>
-          <Field label="Spécialisation souhaitée">
-            <select value={form.specialization} onChange={e => setForm({ ...form, specialization: e.target.value })} className={inputClass} style={inputStyle}>
-              <option value="">Choisir…</option>
-              {config.specializations.map(s => <option key={s.id} value={s.name}>{s.name}{s.description ? ` — ${s.description.slice(0, 50)}` : ""}</option>)}
-            </select>
-          </Field>
-          <Field label="Expérience RP" required>
-            <textarea rows={4} required value={form.experience} onChange={e => setForm({ ...form, experience: e.target.value })} className={`resize-none ${inputClass}`} style={inputStyle} />
-          </Field>
-          <Field label="Motivation" required>
-            <textarea rows={4} required value={form.motivation} onChange={e => setForm({ ...form, motivation: e.target.value })} className={`resize-none ${inputClass}`} style={inputStyle} />
-          </Field>
-
-          {/* Champs personnalisés (premium) */}
+          {/* Champs par défaut (Spécialisation/Expérience/Motivation, éditables/supprimables par l'admin) + champs personnalisés (premium) */}
           {config.fields.map(f => (
             <Field key={f.id} label={f.label} required={f.required} accent={accent}>
               {f.type === "text" && (

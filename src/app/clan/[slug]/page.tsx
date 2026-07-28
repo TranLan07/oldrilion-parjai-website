@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 type Spec = { id: string; name: string; description: string; secret: boolean; color: string | null; order: number };
-type ClanInfo = { name: string; description: string; colorPrimary: string; colorAccent: string; websiteUrl?: string };
+type ClanInfo = { name: string; description: string; colorPrimary: string; colorAccent: string; websiteUrl?: string; bannerUrl?: string | null };
 type ClanValue = { id: string; title: string; description: string; color: string | null; order: number };
 
 export default function Home() {
@@ -30,7 +30,9 @@ export default function Home() {
     <div className="flex flex-col items-center">
       {/* Hero */}
       <section className="relative flex min-h-[85vh] w-full flex-col items-center justify-center px-6 text-center"
-        style={{ background: "var(--grad-void)" }}>
+        style={clan?.bannerUrl
+          ? { backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0.85)), url(${clan.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+          : { background: "var(--grad-void)" }}>
         <div className="pointer-events-none absolute inset-0 opacity-30" style={{ backgroundImage: "var(--texture-weave)" }} />
 
         {session?.user?.name && (

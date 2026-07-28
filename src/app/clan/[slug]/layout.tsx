@@ -52,7 +52,7 @@ export default async function ClanLayout({ children, params }: Props) {
     return (
       <>
         <style dangerouslySetInnerHTML={{ __html: themeVars }} />
-        <ClanNavbar slug={clan.slug} clanName={clan.name} />
+        <ClanNavbar slug={clan.slug} clanName={clan.name} logoUrl={clan.logoUrl} />
         <main className="flex flex-1 items-center justify-center px-6 py-24">
           <div className="max-w-md text-center">
             <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full"
@@ -85,7 +85,7 @@ export default async function ClanLayout({ children, params }: Props) {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: themeVars }} />
-      <ClanNavbar slug={clan.slug} clanName={clan.name} diplomacyPublic={diplomacyPublic} premium={clan.premium} />
+      <ClanNavbar slug={clan.slug} clanName={clan.name} diplomacyPublic={diplomacyPublic} premium={clan.premium} logoUrl={clan.logoUrl} />
       <main className="flex-1" style={{ background: "var(--clan-bg)", color: "var(--clan-text, inherit)" }}>{children}</main>
       <Footer />
     </>

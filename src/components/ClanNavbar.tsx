@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useEffectiveSession } from "./DebugContext";
 
-type Props = { slug: string; clanName: string; diplomacyPublic?: boolean; premium?: boolean };
+type Props = { slug: string; clanName: string; diplomacyPublic?: boolean; premium?: boolean; logoUrl?: string | null };
 
 const linkStyle = "block px-3 py-2 text-sm font-semibold uppercase tracking-[0.14em] transition-colors";
 
-export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }: Props) {
+export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium, logoUrl }: Props) {
   const base = `/clan/${slug}`;
   const pathname = usePathname();
   // Identité effective (réelle ou simulée via le mode debug).
@@ -83,9 +83,15 @@ export default function ClanNavbar({ slug, clanName, diplomacyPublic, premium }:
             onMouseLeave={e => { e.currentTarget.style.color = "var(--beskar-400)"; }}
           >Hub</Link>
           <span style={{ color: "var(--beskar-600)" }}>›</span>
-          <Link href={base} className="text-xl font-bold tracking-[0.18em] sm:text-2xl"
-            style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, var(--gold-500))" }}>
-            {clanName.toUpperCase()}
+          <Link href={base} className="flex items-center gap-2">
+            {logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={clanName} className="h-8 w-8 shrink-0 rounded-full object-cover" style={{ border: "1px solid var(--clan-primary, var(--beskar-600))" }} />
+            )}
+            <span className="text-xl font-bold tracking-[0.18em] sm:text-2xl"
+              style={{ fontFamily: "var(--font-display)", color: "var(--clan-primary, var(--gold-500))" }}>
+              {clanName.toUpperCase()}
+            </span>
           </Link>
         </div>
 

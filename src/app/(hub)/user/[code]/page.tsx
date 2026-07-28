@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import Avatar from "@/components/Avatar";
 
 type ClanInfo = {
   clan: { slug: string; name: string; colorBg: string; colorPrimary: string; colorAccent: string };
   grade: string; role: string; specialization: string; specializationSecret: boolean;
 };
 type PublicProfile = {
-  accessible: true; isOwner: boolean; publicId: string; displayName: string; mandalorien: boolean;
+  accessible: true; isOwner: boolean; publicId: string; displayName: string; avatarUrl: string | null; mandalorien: boolean;
   discours: string | null; bio: string | null; clanInfo: ClanInfo | null;
 };
 type Inaccessible = { accessible: false; reason: "clan_private" };
@@ -51,7 +52,7 @@ export default function PublicProfilePage() {
     );
   }
 
-  const { publicId, displayName, mandalorien, discours, bio, clanInfo, isOwner } = data;
+  const { publicId, displayName, avatarUrl, mandalorien, discours, bio, clanInfo, isOwner } = data;
   const clan = clanInfo?.clan;
 
   return (
@@ -64,10 +65,7 @@ export default function PublicProfilePage() {
 
       <section className="mb-6 rounded-sm border p-6" style={{ borderColor: "#1e1e1e", background: "#0d0d0d" }}>
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full text-xl font-bold flex-shrink-0"
-            style={{ background: "#1a1a1a", color: "#f2f2f5", border: "1px solid #2a2a2a" }}>
-            {displayName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?"}
-          </div>
+          <Avatar src={avatarUrl} name={displayName} size={64} />
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-2xl font-bold uppercase tracking-[0.1em]" style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>
               {displayName}

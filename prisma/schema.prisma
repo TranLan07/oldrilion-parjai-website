@@ -20,6 +20,8 @@ model Clan {
   colorText    String   @default("#e8e6e3")  // couleur de texte custom (premium)
   colorCard    String   @default("#0d0d0d")  // couleur de fond des cartes (premium)
   websiteUrl   String   @default("")  // site web personnel du clan (optionnel) — bouton sur la page d'accueil
+  logoUrl      String?  // logo du clan (upload), affiché dans le header et les listings
+  bannerUrl    String?  // bannière du clan (upload), affichée sur la page d'accueil du clan
   classifiedColor     String?  // couleur du mode classifié (premium, sinon fallback colorAccent)
   classifiedColorMode String   @default("fixed")  // "fixed" | "role" (role = couleur de la spécialisation du membre, premium)
   createdAt    DateTime @default(now())
@@ -38,6 +40,9 @@ model Clan {
   ruleSections  RuleSection[]
   tags          ClanTag[]
   pagePerms     PagePermission[]
+
+  // true dès que l'admin a enregistré le form builder au moins une fois (sinon on affiche les 3 champs par défaut synthétiques)
+  recruitmentFormCustomized Boolean @default(false)
 
   // Config: niveau min pour qu'un admin de clan voie les vrais noms des anonymes
   anonRevealLevel Int @default(5)
@@ -104,6 +109,7 @@ model User {
   username            String   @unique
   passwordHash        String
   displayName         String
+  avatarUrl           String?  // photo de profil (upload)
   // Rôle hub
   hubRole             String   @default("member")  // "member" | "moderator" | "admin"
   // Appartenance clan (null = sans-clan)
@@ -238,8 +244,9 @@ model RecruitmentField {
   id       String  @id @default(cuid())
   clanId   String
   clan     Clan    @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  key      String? // "specialization" | "experience" | "motivation" si ce champ remplace un champ par défaut, sinon null (champ custom)
   label    String
-  type     String  // "text" | "textarea" | "checkbox" | "radio"
+  type     String  // "text" | "textarea" | "checkbox" | "radio" | "specialization" | "grade"
   options  String  @default("[]") // JSON array d'options (radio/checkbox, max 5)
   required Boolean @default(false)
   order    Int     @default(0)

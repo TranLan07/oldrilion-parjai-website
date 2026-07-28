@@ -27,9 +27,9 @@ export async function GET() {
     if (otherId) {
       const u = await prisma.user.findUnique({
         where: { id: otherId },
-        select: { id: true, displayName: true, publicId: true, anonymous: true, clan: { select: { name: true, colorPrimary: true } } },
+        select: { id: true, displayName: true, avatarUrl: true, publicId: true, anonymous: true, clan: { select: { name: true, colorPrimary: true } } },
       });
-      if (u) other = { id: u.id, displayName: u.anonymous ? `Anonyme [${u.publicId}]` : u.displayName, publicId: u.publicId, clan: u.clan };
+      if (u) other = { id: u.id, displayName: u.anonymous ? `Anonyme [${u.publicId}]` : u.displayName, avatarUrl: u.anonymous ? null : u.avatarUrl, publicId: u.publicId, clan: u.clan };
     }
     const last = ch.messages[0] ?? null;
     result.push({

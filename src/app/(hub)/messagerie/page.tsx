@@ -3,8 +3,9 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useRef, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Avatar from "@/components/Avatar";
 
-type BaseMember = { user: { id: string; displayName: string }; muted: boolean };
+type BaseMember = { user: { id: string; displayName: string; avatarUrl?: string | null }; muted: boolean };
 type HubChannelRaw = {
   id: string; name: string; description: string; isPrivate: boolean;
   accessClans: string; accessUsers: string;
@@ -25,7 +26,7 @@ type Channel = {
 type Message = {
   id: string; content: string; createdAt: string;
   mandoa: boolean; originalContent: string | null;
-  user: { id: string; displayName: string; anonymous: boolean; publicId: string; grade?: string; clanId?: string | null; clan?: { name: string; colorPrimary: string } | null };
+  user: { id: string; displayName: string; avatarUrl?: string | null; anonymous: boolean; publicId: string; grade?: string; clanId?: string | null; clan?: { name: string; colorPrimary: string } | null };
 };
 type ClanBasic = { id: string; name: string; colorPrimary: string };
 type ClanTheme = { name: string; colorBg: string; colorPrimary: string; colorAccent: string };
@@ -561,10 +562,8 @@ function MessageriePageInner() {
             const clanColor = msg.user.clan?.colorPrimary ?? accent;
             return (
               <div key={msg.id} className="mb-3 flex gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                  style={{ background: msg.user.anonymous ? "rgba(107,114,128,0.1)" : `${clanColor}20`, color: msg.user.anonymous ? "#6b7280" : clanColor, fontFamily: "var(--font-display)" }}>
-                  {displayName.charAt(0).toUpperCase()}
-                </div>
+                <Avatar src={msg.user.anonymous ? null : msg.user.avatarUrl} name={displayName} size={32}
+                  color={msg.user.anonymous ? "#6b7280" : clanColor} />
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span className="text-sm font-semibold" style={{ color: msg.user.anonymous ? "#4a4a4a" : "#e5e7eb" }}>{displayName}</span>
@@ -636,10 +635,7 @@ function MessageriePageInner() {
           <div className="overflow-y-auto p-2">
             {activeChannel.members.map(m => (
               <div key={m.user.id} className="flex items-center gap-2 rounded px-2 py-1.5">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                  style={{ background: `${accent}15`, color: accent, fontFamily: "var(--font-display)" }}>
-                  {m.user.displayName.charAt(0)}
-                </div>
+                <Avatar src={m.user.avatarUrl} name={m.user.displayName} size={24} color={accent} />
                 <span className="truncate text-sm" style={{ color: m.muted ? "#ef4444" : "#6b7280" }}>{m.user.displayName}</span>
               </div>
             ))}

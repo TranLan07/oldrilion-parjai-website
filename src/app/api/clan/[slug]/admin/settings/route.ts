@@ -12,6 +12,8 @@ export async function GET(_req: NextRequest, { params }: P) {
   if (clan.suspended) return suspendedResponse();
   return NextResponse.json({
     description: clan.description,
+    logoUrl: clan.logoUrl,
+    bannerUrl: clan.bannerUrl,
     colorBg: clan.colorBg,
     colorPrimary: clan.colorPrimary,
     colorAccent: clan.colorAccent,

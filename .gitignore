@@ -54,3 +54,6 @@ next-env.d.ts
 
 # dossier technique interne (usage local, jamais commité)
 /info/
+
+# fichiers uploadés par les utilisateurs (logos, bannières, avatars)
+/public/uploads/

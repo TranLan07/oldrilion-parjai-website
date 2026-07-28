@@ -39,7 +39,7 @@ export async function GET(_req: NextRequest, { params }: P) {
 
   const messages = await prisma.message.findMany({
     where: { channelId: id },
-    include: { user: { select: { id: true, displayName: true, anonymous: true, publicId: true, grade: true, clanId: true, clan: { select: { name: true, colorPrimary: true } } } } },
+    include: { user: { select: { id: true, displayName: true, avatarUrl: true, anonymous: true, publicId: true, grade: true, clanId: true, clan: { select: { name: true, colorPrimary: true } } } } },
     orderBy: { createdAt: "asc" },
     take: 200,
   });
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest, { params }: P) {
 
   const message = await prisma.message.create({
     data: { content: finalContent, originalContent, mandoa: !!originalContent, userId: session.user.id, channelId: id },
-    include: { user: { select: { id: true, displayName: true, anonymous: true, publicId: true, grade: true, clanId: true, clan: { select: { name: true, colorPrimary: true } } } } },
+    include: { user: { select: { id: true, displayName: true, avatarUrl: true, anonymous: true, publicId: true, grade: true, clanId: true, clan: { select: { name: true, colorPrimary: true } } } } },
   });
 
   publish(id, { type: "message", message });

@@ -19,7 +19,7 @@ export async function GET(_: Request, { params }: P) {
   const target = await prisma.user.findUnique({
     where: { publicId },
     select: {
-      id: true, publicId: true, displayName: true, anonymous: true, mandalorien: true,
+      id: true, publicId: true, displayName: true, avatarUrl: true, anonymous: true, mandalorien: true,
       role: true, grade: true, specialization: true, publicSpecialization: true,
       discours: true, bio: true,
       profileVisDiscours: true, profileVisBio: true, profileVisClanInfo: true, profileShowRealSpec: true,
@@ -61,6 +61,7 @@ export async function GET(_: Request, { params }: P) {
   }
 
   const displayName = target.anonymous && !bypass ? target.publicId : target.displayName;
+  const avatarUrl = target.anonymous && !bypass ? null : target.avatarUrl;
 
   let clanInfo = null;
   if (target.clan && visible(target.profileVisClanInfo)) {
@@ -86,6 +87,7 @@ export async function GET(_: Request, { params }: P) {
     isOwner: isSelf,
     publicId: target.publicId,
     displayName,
+    avatarUrl,
     mandalorien: target.mandalorien,
     discours: visible(target.profileVisDiscours) ? target.discours : null,
     bio: visible(target.profileVisBio) ? target.bio : null,

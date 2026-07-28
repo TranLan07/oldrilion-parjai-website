@@ -57,8 +57,19 @@ test.describe("Formulaire de recrutement", () => {
       await expect(p2.getByText(label)).toBeVisible({ timeout: 10000 });
       await ctx.close();
     } finally {
-      // Nettoyage : vide les champs custom
-      await page.request.put("/api/clan/parjai/admin/recruitment-fields", { data: { fields: [] } });
+      // Nettoyage : retire le champ custom ajouté, mais restaure les 3 champs par défaut
+      // (Spécialisation/Expérience/Motivation) — depuis qu'ils sont gérés par le même
+      // form builder, sauvegarder un tableau vide les supprimerait aussi (comportement voulu
+      // pour un admin qui le fait exprès, mais pas pour ce nettoyage de test).
+      await page.request.put("/api/clan/parjai/admin/recruitment-fields", {
+        data: {
+          fields: [
+            { key: "specialization", label: "Spécialisation souhaitée", type: "specialization", options: [], required: false },
+            { key: "experience", label: "Expérience RP", type: "textarea", options: [], required: true },
+            { key: "motivation", label: "Motivation", type: "textarea", options: [], required: true },
+          ],
+        },
+      });
     }
   });
 

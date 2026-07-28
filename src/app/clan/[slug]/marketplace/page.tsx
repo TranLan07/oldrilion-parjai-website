@@ -61,8 +61,8 @@ export default function ClanMarketplacePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
-      <div className="mb-8 flex items-end justify-between gap-4">
-        <div>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: accent, opacity: 0.6 }}>Clan</p>
           <h1 className="text-4xl font-bold uppercase tracking-[0.14em]" style={{ fontFamily: "var(--font-display)", color: "var(--beskar-50)" }}>Marketplace</h1>
           <p className="mt-2 text-sm" style={{ color: "var(--beskar-400)" }}>Les biens et services proposés par le clan.</p>

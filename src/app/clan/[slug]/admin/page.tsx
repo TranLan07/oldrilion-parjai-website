@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useParams } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 type User = { id: string; username: string; displayName: string; role: string; grade: string; specialization: string; permissionLevel: number };
 type Recruitment = { id: string; rpName: string; discord: string; experience: string; motivation: string; specialization: string; status: string; tempPassword?: string; customAnswers?: string };
@@ -652,7 +652,8 @@ function RecruitmentTab({ recruitments, slug, premium, load }: { recruitments: R
   );
 }
 
-type RField = { label: string; type: string; options: string[]; required: boolean };
+type RFieldKey = "specialization" | "experience" | "motivation" | null;
+type RField = { key: RFieldKey; label: string; type: string; options: string[]; required: boolean };
 const FIELD_TYPES = [
   { v: "text", l: "Texte court" },
   { v: "textarea", l: "Texte long" },
@@ -661,8 +662,12 @@ const FIELD_TYPES = [
   { v: "specialization", l: "Spécialisation du clan" },
   { v: "grade", l: "Grade du clan" },
 ];
+const MAX_RECRUITMENT_FIELDS = 13; // 3 champs "par défaut" (renommables/supprimables) + 10 champs custom
 
-// Form builder des champs custom du recrutement (premium, max 10 champs).
+// Form builder du formulaire de recrutement (premium). Nom RP et Discord restent
+// toujours actifs (nécessaires à la création du compte) ; les 3 champs par défaut
+// (Spécialisation/Expérience/Motivation) apparaissent comme des lignes normales,
+// éditables/réordonnables/supprimables au même titre que les champs custom.
 function RecruitmentFieldsBuilder({ slug, premium }: { slug: string; premium: boolean }) {
   const [fields, setFields] = useState<RField[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -671,14 +676,14 @@ function RecruitmentFieldsBuilder({ slug, premium }: { slug: string; premium: bo
 
   useEffect(() => {
     fetch(`/api/clan/${slug}/admin/recruitment-fields`).then(r => r.ok ? r.json() : null).then(d => {
-      if (d) setFields((d.fields || []).map((f: RField) => ({ label: f.label, type: f.type, options: f.options || [], required: f.required })));
+      if (d) setFields((d.fields || []).map((f: RField) => ({ key: f.key ?? null, label: f.label, type: f.type, options: f.options || [], required: f.required })));
       setLoaded(true);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function update(i: number, patch: Partial<RField>) { setFields(fs => fs.map((f, j) => j === i ? { ...f, ...patch } : f)); }
-  function addField() { if (fields.length < 10) setFields(fs => [...fs, { label: "", type: "text", options: [], required: false }]); }
+  function addField() { if (fields.length < MAX_RECRUITMENT_FIELDS) setFields(fs => [...fs, { key: null, label: "", type: "text", options: [], required: false }]); }
   function removeField(i: number) { setFields(fs => fs.filter((_, j) => j !== i)); }
   function move(i: number, dir: -1 | 1) {
     setFields(fs => { const n = [...fs]; const j = i + dir; if (j < 0 || j >= n.length) return n; [n[i], n[j]] = [n[j], n[i]]; return n; });
@@ -694,6 +699,7 @@ function RecruitmentFieldsBuilder({ slug, premium }: { slug: string; premium: bo
     });
     const d = await r.json();
     setSaving(false);
+    if (r.ok) setFields((d.fields || []).map((f: RField) => ({ key: f.key ?? null, label: f.label, type: f.type, options: f.options || [], required: f.required })));
     setMsg(r.ok ? "Formulaire enregistré." : (d.error || "Erreur"));
     setTimeout(() => setMsg(""), 3000);
   }
@@ -704,22 +710,33 @@ function RecruitmentFieldsBuilder({ slug, premium }: { slug: string; premium: bo
     <div className="rounded-lg border p-5 space-y-4" style={{ borderColor: "rgba(201,168,76,0.25)", background: "rgba(201,168,76,0.04)" }}>
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold uppercase tracking-[0.14em]" style={{ color: "#c9a84c" }}>★ Formulaire de recrutement</h3>
-        <span className="text-xs" style={{ color: "var(--beskar-400)" }}>{fields.length}/10 champs</span>
+        {premium && <span className="text-xs" style={{ color: "var(--beskar-400)" }}>{fields.length}/{MAX_RECRUITMENT_FIELDS} champs</span>}
+      </div>
+
+      {/* Nom RP et Discord sont toujours demandés : nécessaires pour créer le compte du candidat. */}
+      <div className="flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--beskar-500)" }}>
+        <span className="rounded border px-2 py-1" style={{ borderColor: "var(--beskar-700)" }}>Nom RP — toujours actif</span>
+        <span className="rounded border px-2 py-1" style={{ borderColor: "var(--beskar-700)" }}>Discord — toujours actif</span>
       </div>
 
       {!premium ? (
         <p className="text-sm" style={{ color: "var(--beskar-400)" }}>
-          L&apos;ajout de champs personnalisés (jusqu&apos;à 10 : texte, zone de texte, choix unique/multiple) est réservé aux clans premium.
-          Les champs par défaut (Nom RP, Discord, Spécialisation, Expérience, Motivation) restent toujours actifs.
+          La personnalisation du formulaire (renommer/réordonner/supprimer les champs Spécialisation, Expérience, Motivation,
+          et ajouter jusqu&apos;à 10 champs custom) est réservée aux clans premium.
         </p>
       ) : (
         <>
           <p className="text-xs" style={{ color: "var(--beskar-400)" }}>
-            Ces champs s&apos;ajoutent aux champs par défaut. Types : texte, zone de texte, choix unique/multiple (max 5 options).
+            Les champs ci-dessous (par défaut ou custom) composent le reste du formulaire — renommez, réordonnez ou supprimez-les librement.
           </p>
           {fields.map((f, i) => (
             <div key={i} className="rounded border p-3 space-y-2" style={{ borderColor: "var(--beskar-700)", background: "var(--beskar-900)" }}>
               <div className="flex flex-wrap items-center gap-2">
+                {f.key && (
+                  <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase" style={{ background: "rgba(201,168,76,0.15)", color: "#c9a84c" }}>
+                    par défaut
+                  </span>
+                )}
                 <input value={f.label} onChange={e => update(i, { label: e.target.value })} placeholder="Intitulé du champ"
                   className={`flex-1 min-w-[160px] ${inp}`} />
                 <select value={f.type} onChange={e => {
@@ -751,7 +768,7 @@ function RecruitmentFieldsBuilder({ slug, premium }: { slug: string; premium: bo
             </div>
           ))}
           <div className="flex flex-wrap items-center gap-2">
-            {fields.length < 10 && <button onClick={addField} className={btnSecondary}>+ Ajouter un champ</button>}
+            {fields.length < MAX_RECRUITMENT_FIELDS && <button onClick={addField} className={btnSecondary}>+ Ajouter un champ</button>}
             <button onClick={save} disabled={saving} className={btnPrimary + " disabled:opacity-50"}>{saving ? "..." : "Enregistrer le formulaire"}</button>
             {msg && <span className="text-xs" style={{ color: msg.includes("enregistré") ? "#22c55e" : "#ef4444" }}>{msg}</span>}
           </div>
@@ -1702,6 +1719,8 @@ function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
   const [classifiedColorMode, setClassifiedColorMode] = useState<"fixed" | "role">("fixed");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/clan/${slug}/admin/settings`).then(r => r.ok ? r.json() : null).then(d => {
@@ -1709,6 +1728,8 @@ function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
         setColors({ colorBg: d.colorBg, colorPrimary: d.colorPrimary, colorAccent: d.colorAccent, colorText: d.colorText ?? "#e8e6e3", colorCard: d.colorCard ?? "#0d0d0d" });
         setClassifiedColor(d.classifiedColor ?? null);
         setClassifiedColorMode(d.classifiedColorMode === "role" ? "role" : "fixed");
+        setLogoUrl(d.logoUrl ?? null);
+        setBannerUrl(d.bannerUrl ?? null);
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1752,6 +1773,14 @@ function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
   return (
     <div className="space-y-6 max-w-md">
       <p className="text-sm text-foreground/50">Personnalisez la direction artistique de votre espace clan.</p>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <MediaUploader slug={slug} type="logo" label="Logo du clan" url={logoUrl} onChange={setLogoUrl}
+          hint="Affiché dans le header du clan. Carré recommandé." aspect="square" />
+        <MediaUploader slug={slug} type="banner" label="Bannière du clan" url={bannerUrl} onChange={setBannerUrl}
+          hint="Affichée en haut de la page d'accueil du clan. Format large recommandé." aspect="wide" />
+      </div>
+
       <div className="space-y-5">
         {baseFields.map(f => <Picker key={f.field} {...f} />)}
       </div>
@@ -1812,6 +1841,61 @@ function ThemeTab({ slug, premium }: { slug: string; premium: boolean }) {
       <button onClick={save} disabled={saving} className={btnPrimary + " disabled:opacity-50"}>
         {saving ? "Sauvegarde..." : saved ? "Sauvegardé !" : "Appliquer"}
       </button>
+    </div>
+  );
+}
+
+// Upload/suppression du logo ou de la bannière d'un clan (png/jpg/webp/gif).
+function MediaUploader({ slug, type, label, url, onChange, hint, aspect }: {
+  slug: string; type: "logo" | "banner"; label: string; url: string | null; onChange: (url: string | null) => void;
+  hint: string; aspect: "square" | "wide";
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function upload(file: File) {
+    setBusy(true); setErr("");
+    const form = new FormData();
+    form.append("type", type);
+    form.append("file", file);
+    const r = await fetch(`/api/clan/${slug}/admin/media`, { method: "POST", body: form });
+    const d = await r.json();
+    setBusy(false);
+    if (r.ok) onChange(d.url);
+    else setErr(d.error || "Erreur lors de l'upload.");
+  }
+
+  async function remove() {
+    setBusy(true); setErr("");
+    await fetch(`/api/clan/${slug}/admin/media`, {
+      method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }),
+    });
+    setBusy(false);
+    onChange(null);
+  }
+
+  return (
+    <div>
+      <label className="block text-xs font-semibold uppercase tracking-wider text-foreground/50">{label}</label>
+      <p className="mb-2 text-[10px] text-foreground/30">{hint}</p>
+      <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+      <div className={`flex items-center justify-center overflow-hidden rounded border border-accent-dim/30 bg-background ${aspect === "square" ? "h-24 w-24" : "h-24 w-full"}`}>
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt={label} className="h-full w-full object-cover" />
+        ) : (
+          <span className="text-xs text-foreground/30">Aucun</span>
+        )}
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className={btnSecondary + " disabled:opacity-50"}>
+          {busy ? "..." : url ? "Changer" : "Uploader"}
+        </button>
+        {url && <button type="button" onClick={remove} disabled={busy} className="text-xs" style={{ color: "#ef4444" }}>Supprimer</button>}
+      </div>
+      {err && <p className="mt-1 text-xs" style={{ color: "#ef4444" }}>{err}</p>}
     </div>
   );
 }

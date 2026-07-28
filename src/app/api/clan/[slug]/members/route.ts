@@ -12,7 +12,7 @@ export async function GET(_: Request, { params }: P) {
 
   const users = await prisma.user.findMany({
     where: { clanId: clan.id },
-    select: { id: true, displayName: true, grade: true, specialization: true, publicSpecialization: true, anonymous: true, publicId: true },
+    select: { id: true, displayName: true, avatarUrl: true, grade: true, specialization: true, publicSpecialization: true, anonymous: true, publicId: true },
     orderBy: { createdAt: "asc" },
   });
 
@@ -22,6 +22,7 @@ export async function GET(_: Request, { params }: P) {
       id: u.id,
       publicId: u.publicId,
       displayName: u.anonymous ? u.publicId : u.displayName,
+      avatarUrl: u.anonymous ? null : u.avatarUrl,
       grade: u.grade,
       specialization: isDha ? (u.publicSpecialization || "Kyramud") : (u.specialization || "—"),
       anonymous: u.anonymous,

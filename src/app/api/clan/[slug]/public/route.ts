@@ -10,7 +10,7 @@ export async function GET(_: Request, { params }: P) {
     select: {
       id: true, name: true, description: true,
       colorBg: true, colorPrimary: true, colorAccent: true,
-      websiteUrl: true,
+      websiteUrl: true, premium: true, logoUrl: true, bannerUrl: true,
       pagePerms: { where: { path: "diplomatie" }, select: { minPermission: true } },
     },
   });
@@ -22,7 +22,8 @@ export async function GET(_: Request, { params }: P) {
   return NextResponse.json({
     name: clan.name, description: clan.description,
     colorBg: clan.colorBg, colorPrimary: clan.colorPrimary, colorAccent: clan.colorAccent,
-    websiteUrl: clan.websiteUrl,
+    websiteUrl: clan.websiteUrl, premium: clan.premium,
+    logoUrl: clan.logoUrl, bannerUrl: clan.bannerUrl,
     diplomacyPublic,
   });
 }

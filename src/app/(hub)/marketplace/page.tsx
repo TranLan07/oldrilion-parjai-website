@@ -84,8 +84,8 @@ export default function MarketplacePage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <div className="mb-8 flex items-end justify-between">
-        <div>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: "#4a4a4a" }}>Hub</p>
           <h1 className="text-4xl font-bold uppercase tracking-[0.14em]" style={{ fontFamily: "var(--font-display)", color: "#f2f2f5" }}>Marketplace</h1>
           <p className="mt-2 text-sm" style={{ color: "#6b7280" }}>Échanges de crédits et services entre Mandalorians.</p>

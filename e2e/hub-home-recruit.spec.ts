@@ -44,6 +44,17 @@ test("champ de recrutement de type Spécialisation : rendu en select des spés d
     expect(opts).not.toContain("Dha");
     await ctx.close();
   } finally {
-    await page.request.put("/api/clan/parjai/admin/recruitment-fields", { data: { fields: [] } });
+    // Nettoyage : retire le champ custom ajouté, mais restaure les 3 champs par défaut
+    // (Spécialisation/Expérience/Motivation) — ils sont gérés par le même form builder,
+    // donc un tableau vide les supprimerait aussi.
+    await page.request.put("/api/clan/parjai/admin/recruitment-fields", {
+      data: {
+        fields: [
+          { key: "specialization", label: "Spécialisation souhaitée", type: "specialization", options: [], required: false },
+          { key: "experience", label: "Expérience RP", type: "textarea", options: [], required: true },
+          { key: "motivation", label: "Motivation", type: "textarea", options: [], required: true },
+        ],
+      },
+    });
   }
 });

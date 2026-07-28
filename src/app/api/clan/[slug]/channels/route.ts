@@ -30,7 +30,7 @@ export async function GET(_: Request, { params }: P) {
       }),
     },
     include: {
-      members: { select: { muted: true, user: { select: { id: true, displayName: true } } } },
+      members: { select: { muted: true, user: { select: { id: true, displayName: true, avatarUrl: true } } } },
       _count: { select: { messages: true } },
     },
     orderBy: { createdAt: "asc" },
@@ -40,7 +40,7 @@ export async function GET(_: Request, { params }: P) {
 
   const allUsers = await prisma.user.findMany({
     where: { clanId: clan.id },
-    select: { id: true, displayName: true },
+    select: { id: true, displayName: true, avatarUrl: true },
     orderBy: { displayName: "asc" },
   });
 
@@ -49,7 +49,7 @@ export async function GET(_: Request, { params }: P) {
       const registeredIds = new Set(ch.members.map(m => m.user.id));
       const allMembers = allUsers.map(u => ({
         muted: ch.members.find(m => m.user.id === u.id)?.muted || false,
-        user: { id: u.id, displayName: u.displayName },
+        user: { id: u.id, displayName: u.displayName, avatarUrl: u.avatarUrl },
       }));
       allMembers.sort((a, b) => (registeredIds.has(a.user.id) ? 0 : 1) - (registeredIds.has(b.user.id) ? 0 : 1));
       return { ...ch, members: allMembers };

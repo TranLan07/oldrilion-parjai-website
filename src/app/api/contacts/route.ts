@@ -11,7 +11,7 @@ export async function GET() {
     include: {
       target: {
         select: {
-          id: true, publicId: true, displayName: true, username: true, anonymous: true,
+          id: true, publicId: true, displayName: true, avatarUrl: true, username: true, anonymous: true,
           clan: { select: { name: true, slug: true, colorPrimary: true } },
         },
       },
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     include: {
       target: {
         select: {
-          id: true, publicId: true, displayName: true, username: true, anonymous: true,
+          id: true, publicId: true, displayName: true, avatarUrl: true, username: true, anonymous: true,
           clan: { select: { name: true, slug: true, colorPrimary: true } },
         },
       },

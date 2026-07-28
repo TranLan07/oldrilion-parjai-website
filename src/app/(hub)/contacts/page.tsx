@@ -4,15 +4,16 @@ import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Avatar from "@/components/Avatar";
 
 type ContactTarget = {
-  id: string; publicId: string; displayName: string; username: string; anonymous: boolean;
+  id: string; publicId: string; displayName: string; avatarUrl: string | null; username: string; anonymous: boolean;
   clan: { name: string; slug: string; colorPrimary: string } | null;
 };
 type Contact = { id: string; nickname: string; target: ContactTarget };
 type Conversation = {
   channelId: string;
-  other: { id: string; displayName: string; publicId: string; clan: { name: string; colorPrimary: string } | null } | null;
+  other: { id: string; displayName: string; avatarUrl: string | null; publicId: string; clan: { name: string; colorPrimary: string } | null } | null;
   lastMessage: { content: string; createdAt: string } | null;
   messageCount: number;
 };
@@ -119,10 +120,7 @@ export default function ContactsPage() {
                 style={{ borderColor: "#1a1a1a", background: "#0d0d0d" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = "#2a2a2a"; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = "#1a1a1a"; }}>
-                <div className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold flex-shrink-0"
-                  style={{ background: "#1a1a1a", color: "#f2f2f5", border: "1px solid #2a2a2a" }}>
-                  {(cv.other?.displayName ?? "?").charAt(0).toUpperCase()}
-                </div>
+                <Avatar src={cv.other?.avatarUrl} name={cv.other?.displayName ?? "?"} size={36} color="#f2f2f5" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-semibold text-sm truncate" style={{ color: "#f2f2f5" }}>{cv.other?.displayName ?? "Inconnu"}</p>
@@ -177,10 +175,7 @@ export default function ContactsPage() {
             return (
               <div key={c.id} className="rounded-sm border p-4 flex items-center gap-4"
                 style={{ borderColor: "#1a1a1a", background: "#0d0d0d" }}>
-                <div className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold flex-shrink-0"
-                  style={{ background: "#1a1a1a", color: "#f2f2f5", border: "1px solid #2a2a2a" }}>
-                  {name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2) || "?"}
-                </div>
+                <Avatar src={c.target.anonymous ? null : c.target.avatarUrl} name={name} size={36} color="#f2f2f5" />
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm truncate" style={{ color: "#f2f2f5" }}>{display}</p>
                   <div className="flex items-center gap-2 mt-0.5">

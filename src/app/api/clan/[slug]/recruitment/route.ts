@@ -2,17 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { resolveClan, notFound, suspendedResponse } from "@/lib/clan-auth";
+import { getRecruitmentFields } from "@/lib/recruitment-fields";
 
 type P = { params: Promise<{ slug: string }> };
 
-// GET public : configuration du formulaire (spés non-secrètes + champs custom).
+// GET public : configuration du formulaire (spés non-secrètes + champs par défaut/custom unifiés).
 export async function GET(_: Request, { params }: P) {
   const { slug } = await params;
   const clan = await resolveClan(slug);
   if (!clan) return notFound();
   if (clan.suspended) return suspendedResponse();
 
-  const [specs, grades] = await Promise.all([
+  const [specs, grades, fields] = await Promise.all([
     prisma.specialization.findMany({
       where: { clanId: clan.id, secret: false }, // jamais les spés secrètes
       select: { id: true, name: true, description: true },
@@ -23,21 +24,18 @@ export async function GET(_: Request, { params }: P) {
       select: { name: true },
       orderBy: { order: "asc" },
     }),
+    getRecruitmentFields(clan),
   ]);
-
-  // Les champs custom ne sont actifs que pour les clans premium
-  const fields = clan.premium
-    ? await prisma.recruitmentField.findMany({ where: { clanId: clan.id }, orderBy: { order: "asc" } })
-    : [];
 
   return NextResponse.json({
     clanName: clan.name,
     colorBg: clan.colorBg,
     colorPrimary: clan.colorPrimary,
     colorAccent: clan.colorAccent,
+    premium: clan.premium,
     specializations: specs,
     grades: grades.map(g => g.name),
-    fields: fields.map(f => ({ id: f.id, label: f.label, type: f.type, options: safeJson(f.options), required: f.required, order: f.order })),
+    fields,
   });
 }
 
@@ -49,9 +47,9 @@ export async function POST(req: NextRequest, { params }: P) {
   if (clan.suspended) return suspendedResponse();
 
   const body = await req.json();
-  const { rpName, discord, experience, motivation, specialization, customAnswers } = body;
-  if (!rpName?.trim() || !discord?.trim() || !experience?.trim() || !motivation?.trim()) {
-    return NextResponse.json({ error: "Tous les champs principaux sont requis" }, { status: 400 });
+  const { rpName, discord, customAnswers } = body;
+  if (!rpName?.trim() || !discord?.trim()) {
+    return NextResponse.json({ error: "Nom RP et Discord sont requis" }, { status: 400 });
   }
 
   // Si le candidat est connecté, on lie sa candidature à son compte existant.
@@ -66,23 +64,40 @@ export async function POST(req: NextRequest, { params }: P) {
     applicantId = me?.id ?? null;
   }
 
-  // Valide les champs custom requis (uniquement pour clans premium)
+  const fields = await getRecruitmentFields(clan);
+  const provided: Record<string, string> = {};
+  if (Array.isArray(customAnswers)) {
+    for (const a of customAnswers) {
+      if (a && typeof a.id === "string") provided[a.id] = typeof a.value === "string" ? a.value : String(a.value ?? "");
+    }
+  }
+
+  // Champs "clés" (spécialisation / expérience / motivation) : peuvent avoir été renommés,
+  // rendus optionnels, réordonnés ou supprimés par l'admin dans le form builder.
+  const byKey: Record<string, (typeof fields)[number] | undefined> = {
+    specialization: fields.find(f => f.key === "specialization"),
+    experience: fields.find(f => f.key === "experience"),
+    motivation: fields.find(f => f.key === "motivation"),
+  };
+  const keyedValues: Record<string, string> = { specialization: "", experience: "", motivation: "" };
+  for (const key of ["specialization", "experience", "motivation"] as const) {
+    const f = byKey[key];
+    if (!f) continue; // supprimé du formulaire par l'admin : on n'en tient pas compte
+    const val = (provided[f.id] ?? "").trim();
+    if (f.required && !val) {
+      return NextResponse.json({ error: `Le champ « ${f.label} » est requis` }, { status: 400 });
+    }
+    keyedValues[key] = val;
+  }
+
+  // Champs custom (sans clé) : uniquement pertinents pour les clans premium ayant personnalisé le formulaire.
   const answers: Array<{ label: string; value: string }> = [];
-  if (clan.premium) {
-    const fields = await prisma.recruitmentField.findMany({ where: { clanId: clan.id } });
-    const provided: Record<string, string> = {};
-    if (Array.isArray(customAnswers)) {
-      for (const a of customAnswers) {
-        if (a && typeof a.id === "string") provided[a.id] = typeof a.value === "string" ? a.value : String(a.value ?? "");
-      }
+  for (const f of fields.filter(f => !f.key)) {
+    const val = provided[f.id] ?? "";
+    if (f.required && !val.trim()) {
+      return NextResponse.json({ error: `Le champ « ${f.label} » est requis` }, { status: 400 });
     }
-    for (const f of fields) {
-      const val = provided[f.id] ?? "";
-      if (f.required && !val.trim()) {
-        return NextResponse.json({ error: `Le champ « ${f.label} » est requis` }, { status: 400 });
-      }
-      answers.push({ label: f.label, value: val });
-    }
+    answers.push({ label: f.label, value: val });
   }
 
   const recruitment = await prisma.recruitment.create({
@@ -90,16 +105,12 @@ export async function POST(req: NextRequest, { params }: P) {
       clanId: clan.id,
       rpName: rpName.trim(),
       discord: discord.trim(),
-      experience: experience.trim(),
-      motivation: motivation.trim(),
-      specialization: specialization || "",
+      experience: keyedValues.experience,
+      motivation: keyedValues.motivation,
+      specialization: keyedValues.specialization,
       customAnswers: JSON.stringify(answers),
       applicantId,
     },
   });
   return NextResponse.json({ success: true, id: recruitment.id });
-}
-
-function safeJson(s: string): string[] {
-  try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; }
 }
